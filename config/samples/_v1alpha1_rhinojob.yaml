@@ -1,0 +1,12 @@
+apiVersion: openrhino.org/v1alpha1
+kind: RhinoJob
+metadata:
+  labels:
+    app.kubernetes.io/name: rhinojob
+    app.kubernetes.io/instance: rhinojob-sample
+    app.kubernetes.io/part-of: rhino-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: rhino-operator
+  name: rhinojob-sample
+spec:
+  # TODO(user): Add fields here

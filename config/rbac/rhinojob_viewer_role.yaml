@@ -1,0 +1,27 @@
+# permissions for end users to view rhinojobs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: rhinojob-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: rhino-operator
+    app.kubernetes.io/part-of: rhino-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: rhinojob-viewer-role
+rules:
+- apiGroups:
+  - openrhino.org
+  resources:
+  - rhinojobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - openrhino.org
+  resources:
+  - rhinojobs/status
+  verbs:
+  - get

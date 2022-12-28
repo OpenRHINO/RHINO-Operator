@@ -1,0 +1,59 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - openrhino.org
+  resources:
+  - functions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - openrhino.org
+  resources:
+  - functions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - openrhino.org
+  resources:
+  - functions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - openrhino.org
+  resources:
+  - rhinojobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - openrhino.org
+  resources:
+  - rhinojobs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - openrhino.org
+  resources:
+  - rhinojobs/status
+  verbs:
+  - get
+  - patch
+  - update

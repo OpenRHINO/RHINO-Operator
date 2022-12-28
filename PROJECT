@@ -1,0 +1,23 @@
+domain: openrhino.org
+layout:
+- go.kubebuilder.io/v3
+projectName: rhino-operator
+repo: openrhino.org/operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: openrhino.org
+  kind: Function
+  path: openrhino.org/operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: openrhino.org
+  kind: RhinoJob
+  path: openrhino.org/operator/api/v1alpha1
+  version: v1alpha1
+version: "3"
