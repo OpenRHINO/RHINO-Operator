@@ -28,18 +28,38 @@ type RhinoJobSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of RhinoJob. Edit rhinojob_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// +optional
+	// +kubebuilder:validation:Minimum:=1
+	// +kubebuilder:default:=1
+	Parallelism *int32 `json:"parallelism,omitempty"`
+	// +optional
+	// +kubebuilder:validation:Minimum:=0
+	// +kubebuilder:default:=0
+	TTL     *int32   `json:"ttl,omitempty"`
+	AppExec string   `json:"appExec"`
+	AppArgs []string `json:"appArgs"`
 }
 
 // RhinoJobStatus defines the observed state of RhinoJob
 type RhinoJobStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	JobStatus JobStatus `json:"jobStatus"`
 }
+type JobStatus string
+
+const (
+	Pending   JobStatus = "Pending"
+	Running   JobStatus = "Running"
+	Failed    JobStatus = "Failed"
+	Completed JobStatus = "Completed"
+)
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Parallelism",type=integer,JSONPath=`.spec.parallelism`
+//+kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.jobStatus`
+//+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // RhinoJob is the Schema for the rhinojobs API
 type RhinoJob struct {
