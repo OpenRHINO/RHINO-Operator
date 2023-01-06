@@ -129,7 +129,7 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	//处理 TTL
 	if *rhinojob.Spec.TTL > 0 {
-		ttl_left := rhinojob.CreationTimestamp.Add(time.Minute * time.Duration(*rhinojob.Spec.TTL)).Sub(time.Now())
+		ttl_left := rhinojob.CreationTimestamp.Add(time.Second * time.Duration(*rhinojob.Spec.TTL)).Sub(time.Now())
 		if ttl_left > 0 {
 			return ctrl.Result{RequeueAfter: ttl_left}, nil
 		}
@@ -231,12 +231,12 @@ func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha1.RhinoJo
 		},
 	}
 
-	if rj.Spec.DataPath != "" && rj.Spec.Server != "" {
+	if rj.Spec.DataPath != "" && rj.Spec.DataServer != "" {
 		job.Spec.Template.Spec.Volumes = []kcorev1.Volume{{
 			Name: "data",
 			VolumeSource: kcorev1.VolumeSource{
 				NFS: &kcorev1.NFSVolumeSource{
-					Server: rj.Spec.Server,
+					Server: rj.Spec.DataServer,
 					Path:   rj.Spec.DataPath,
 				},
 			},

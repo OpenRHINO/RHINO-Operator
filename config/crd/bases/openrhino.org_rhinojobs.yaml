@@ -53,6 +53,8 @@ spec:
                 type: string
               dataPath:
                 type: string
+              dataServer:
+                type: string
               image:
                 type: string
               parallelism:
@@ -60,10 +62,8 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
-              server:
-                type: string
               ttl:
-                default: 10
+                default: 600
                 format: int32
                 minimum: 0
                 type: integer

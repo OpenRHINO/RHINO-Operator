@@ -10,11 +10,11 @@ metadata:
   name: rhinojob-grape
 spec:
   image: "zhuhe0321/libgrape"
-  ttl: 3
+  ttl: 300
   parallelism: 2
   appExec: "./libgrape"
   appArgs: ["--vfile", "/data/p2p-31.v","--efile", "/data/p2p-31.e",
           "--application", "sssp", "--sssp_source", "6", 
           "--out_prefix", "/data/output_sssp", "--directed"]
-  server: "10.0.0.7"
+  dataServer: "10.0.0.7"
   dataPath: "/kfnmck56"

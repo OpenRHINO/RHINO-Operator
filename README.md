@@ -15,24 +15,24 @@ metadata:
   name: rhinojob-sample
 spec:
   image: "zhuhe0321/libgrape:v1.0"
-  ttl: 10
+  ttl: 300
   parallelism: 4
   appExec: "./libgrape"
   appArgs: ["--vfile", "/data/p2p-31.v","--efile", "/data/p2p-31.e",
           "--application", "sssp", "--sssp_source", "6", 
           "--out_prefix", "/data/output_sssp", "--directed"]
-  server: "10.0.0.7"
+  dataServer: "10.0.0.7"
   dataPath: "/kfnmck56"
   
 ```
 ### API字段定义
 #### Spec
 - image：使用RHINO-cli工具build的镜像
-- ttl：用户预估的job执行时间(单位min)，默认时间10min，超过预估时间5min将终止job执行
+- ttl：用户预估的job执行时间(单位s)，默认时间600s，超过预估时间将终止job执行
 - parallelism：并行度，MPI任务运行的总进程个数，默认值为1
 - appExec：镜像中可执行文件的位置
 - appArgs：MPI任务的运行参数，如果并行MPI job需要读写数据，需要使用/data目录
-- server: NFS服务器地址
+- dataServer: NFS服务器地址
 - dataPath：NFS服务器挂载目录，RHINO-Operator会将该目录挂载到所有worker容器的/data路径下
 #### Status
 - pending：主控容器或任一工作容器未部署成功

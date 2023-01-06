@@ -35,12 +35,12 @@ type RhinoJobSpec struct {
 	Parallelism *int32 `json:"parallelism,omitempty"`
 	// +optional
 	// +kubebuilder:validation:Minimum:=0
-	// +kubebuilder:default:=10
-	TTL      *int32   `json:"ttl,omitempty"`
-	AppExec  string   `json:"appExec"`
-	AppArgs  []string `json:"appArgs,omitempty"`
-	Server   string   `json:"server,omitempty"`
-	DataPath string   `json:"dataPath,omitempty"`
+	// +kubebuilder:default:=600
+	TTL        *int32   `json:"ttl,omitempty"`
+	AppExec    string   `json:"appExec"`
+	AppArgs    []string `json:"appArgs,omitempty"`
+	DataServer string   `json:"dataServer,omitempty"`
+	DataPath   string   `json:"dataPath,omitempty"`
 }
 
 // RhinoJobStatus defines the observed state of RhinoJob
