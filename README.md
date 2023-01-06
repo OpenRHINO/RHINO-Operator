@@ -1,1 +1,41 @@
 # RHINO-Operator
+
+## RhinoJob
+### API访问示例
+```
+apiVersion: openrhino.org/v1alpha1
+kind: RhinoJob
+metadata:
+  labels:
+    app.kubernetes.io/name: rhinojob
+    app.kubernetes.io/instance: rhinojob-sample
+    app.kubernetes.io/part-of: rhino-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: rhino-operator
+  name: rhinojob-sample
+spec:
+  image: "zhuhe0321/libgrape:v1.0"
+  ttl: 300
+  parallelism: 4
+  appExec: "./libgrape"
+  appArgs: ["--vfile", "/data/p2p-31.v","--efile", "/data/p2p-31.e",
+          "--application", "sssp", "--sssp_source", "6", 
+          "--out_prefix", "/data/output_sssp", "--directed"]
+  dataServer: "10.0.0.7"
+  dataPath: "/kfnmck56"
+  
+```
+### API字段定义
+#### Spec
+- image：使用RHINO-cli工具build的镜像
+- ttl：用户预估的job执行时间(单位s)，默认时间600s，超过预估时间将终止job执行
+- parallelism：并行度，MPI任务运行的总进程个数，默认值为1
+- appExec：镜像中可执行文件的位置
+- appArgs：MPI任务的运行参数，如果并行MPI job需要读写数据，需要使用/data目录
+- dataServer: NFS服务器地址
+- dataPath：NFS服务器挂载目录，RHINO-Operator会将该目录挂载到所有worker容器的/data路径下
+#### Status
+- pending：主控容器或任一工作容器未部署成功
+- running：所有容器都处于运行状态
+- failed：主控容器或任一工作容器运行时出现错误
+- completed：主控容器和所有工作容器都执行完毕

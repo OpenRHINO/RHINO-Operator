@@ -71,7 +71,7 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	var foundCtlJob kbatchv1.Job
 	var foundWorkersJob kbatchv1.Job
-	//获取该 RhinoJob 对应的 MPI controller Job 和 workers job，若 都 不存在，则创建它们
+	//获取该 RhinoJob 对应的 MPI controller Job 和 workers job，若都不存在，则创建它们
 	//若只有一个不存在，另一个正常运行，则不做任何处理，因为这种情况只有三种可能：1. 刚要创建某个job，还查不到；2. 故障导致上次该job创建失败；3. 因人为、故障或其他原因导致删除。
 	//这三种可能都不应当重新触发创建流程：对于情况1，让它继续运行就好；情况2 或 情况3，即一个如果没了，只有另一个在，重新创建出来也意义也不大，大概率是连不上，或者任务仍然会失败，
 	//然而如果人为把这另一个job也删掉，作为修复故障的手段是OK的，这就是让这个rhinojob重新跑
@@ -79,21 +79,21 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	errGetWorkersJob := r.Get(ctx, types.NamespacedName{Namespace: rhinojob.Namespace, Name: nameForWorkersJob(rhinojob.Name)}, &foundWorkersJob)
 
 	if errors.IsNotFound(errGetCtlJob) && errors.IsNotFound(errGetWorkersJob) { //主控 Job 和 workers Job 都不存在
-		// 根据获取的 GrapeJob，构造主控 Job
+		// 根据获取的 RhinoJob，构造主控 Job
 		ctlJob := r.constructCtlJob(&rhinojob)
 		// 创建主控 Job
 		if err := r.Create(ctx, ctlJob); err != nil && !errors.IsAlreadyExists(err) {
 			//若主控 Job 创建失败，而且失败原因也不是“资源已存在”，报错并返回错误
-			logger.Error(err, "Unable to create controller job for GrapeJob", "Job", ctlJob)
+			logger.Error(err, "Unable to create controller job for RhinoJob", "Job", ctlJob)
 			return ctrl.Result{}, err
 		}
 		logger.Info("Controller job created", "job", ctlJob)
-		time.Sleep(3 * time.Second) //等待主控服务进程可用
+		time.Sleep(10 * time.Second) //等待主控服务进程可用
 
 		//构造 Workers Job
 		workersJob := r.constructWorkersJob(&rhinojob, ctx)
 		if err := r.Create(ctx, workersJob); err != nil && !errors.IsAlreadyExists(err) {
-			logger.Error(err, "Unable to create workers job for GrapeJob", "Job", workersJob)
+			logger.Error(err, "Unable to create workers job for RhinoJob", "Job", workersJob)
 			return ctrl.Result{}, err
 		}
 		logger.Info("Workers job created", "job", workersJob)
@@ -123,7 +123,7 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 	if err := r.Status().Update(ctx, &rhinojob); err != nil {
-		logger.Error(err, "Failed to update GrapeJob status")
+		logger.Error(err, "Failed to update RhinoJob status")
 		return ctrl.Result{}, err
 	}
 
@@ -156,23 +156,23 @@ func nameForWorkersJob(rhinoJobName string) string {
 }
 
 // 构造主控Job
-func (r *RhinoJobReconciler) constructCtlJob(gj *rhinooprapiv1alpha1.RhinoJob) *kbatchv1.Job {
-	name := nameForCtl(gj.Name)
-	controllerPodLabels := labelsForCtlPod(gj.Name)
+func (r *RhinoJobReconciler) constructCtlJob(rj *rhinooprapiv1alpha1.RhinoJob) *kbatchv1.Job {
+	name := nameForCtl(rj.Name)
+	controllerPodLabels := labelsForCtlPod(rj.Name)
 
 	// 构造主控进程的命令行
 	hostsIDs := "0"
-	for i := 1; i < int(*gj.Spec.Parallelism); i++ {
+	for i := 1; i < int(*rj.Spec.Parallelism); i++ {
 		hostsIDs = fmt.Sprintf("%s, %d", hostsIDs, i)
 	}
 	cmdArgs := append([]string{"-launcher", "manual", "-verbose", "-disable-hostname-propagation", "-hosts", hostsIDs,
-		gj.Spec.AppExec}, gj.Spec.AppArgs...)
+		rj.Spec.AppExec}, rj.Spec.AppArgs...)
 
 	// 构造主控 Job
 	job := &kbatchv1.Job{
 		ObjectMeta: kmetav1.ObjectMeta{
 			Name:      name,
-			Namespace: gj.Namespace,
+			Namespace: rj.Namespace,
 		},
 		Spec: kbatchv1.JobSpec{
 			Template: kcorev1.PodTemplateSpec{
@@ -181,58 +181,48 @@ func (r *RhinoJobReconciler) constructCtlJob(gj *rhinooprapiv1alpha1.RhinoJob) *
 				},
 				Spec: kcorev1.PodSpec{
 					Containers: []kcorev1.Container{{
-						// 目前这里的镜像名是写死的，这个后面要改一下
-						Image:   "limingyu007/run_app:v1.1",
+						Image:   rj.Spec.Image,
 						Name:    "rhino-mpi-controller",
 						Command: []string{"mpirun"},
 						Args:    cmdArgs,
-						Env: []kcorev1.EnvVar{{
-							Name:  "MPICH_PORT_RANGE",
-							Value: "20000:20100",
-						}},
-						Ports: []kcorev1.ContainerPort{{
-							ContainerPort: 20000,
-						}},
 					}},
 					RestartPolicy: "Never",
 				},
 			},
 		},
 	}
-	ctrl.SetControllerReference(gj, job, r.Scheme)
+	ctrl.SetControllerReference(rj, job, r.Scheme)
 
 	return job
 }
 
 // 构造 Workers Job
-func (r *RhinoJobReconciler) constructWorkersJob(gj *rhinooprapiv1alpha1.RhinoJob, ctx context.Context) *kbatchv1.Job {
-	name := nameForWorkersJob(gj.Name)
-	ctlPodLabels := labelsForCtlPod(gj.Name)
+func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha1.RhinoJob, ctx context.Context) *kbatchv1.Job {
+	name := nameForWorkersJob(rj.Name)
+	ctlPodLabels := labelsForCtlPod(rj.Name)
 
 	var foundPodList kcorev1.PodList
 	r.List(ctx, &foundPodList, client.MatchingLabels(ctlPodLabels))
-
 	completionMode := "Indexed"
-	cmdArgs := []string{"-c", "hydra_pmi_proxy --control-port " + foundPodList.Items[0].Status.PodIP +
-		":20000 --debug --demux poll --pgid 0 --retries 10 --usize -2 --proxy-id $JOB_COMPLETION_INDEX"}
+	cmdArgs := []string{"-c", "/usr/local/bin/hydra_pmi_proxy --control-port " + foundPodList.Items[0].Status.PodIP +
+		":20000 --debug --rmk user --launcher manual --demux poll --pgid 0 --retries 10 --usize -2 --proxy-id $JOB_COMPLETION_INDEX"}
 
 	// 构造 Workers Job
 	job := &kbatchv1.Job{
 		ObjectMeta: kmetav1.ObjectMeta{
 			Name:      name,
-			Namespace: gj.Namespace,
+			Namespace: rj.Namespace,
 		},
 		Spec: kbatchv1.JobSpec{
 			CompletionMode: (*kbatchv1.CompletionMode)(&completionMode),
-			Completions:    gj.Spec.Parallelism,
-			Parallelism:    gj.Spec.Parallelism,
+			Completions:    rj.Spec.Parallelism,
+			Parallelism:    rj.Spec.Parallelism,
 			Template: kcorev1.PodTemplateSpec{
 				Spec: kcorev1.PodSpec{
 					Containers: []kcorev1.Container{{
-						// 目前这里的镜像名是写死的，这个后面要改一下
-						Image:   "limingyu007/run_app:v1.1",
+						Image:   rj.Spec.Image,
 						Name:    "rhino-mpi-worker",
-						Command: []string{"bash"},
+						Command: []string{"ash"},
 						Args:    cmdArgs,
 					}},
 					RestartPolicy: "Never",
@@ -240,7 +230,24 @@ func (r *RhinoJobReconciler) constructWorkersJob(gj *rhinooprapiv1alpha1.RhinoJo
 			},
 		},
 	}
-	ctrl.SetControllerReference(gj, job, r.Scheme)
+
+	if rj.Spec.DataPath != "" && rj.Spec.DataServer != "" {
+		job.Spec.Template.Spec.Volumes = []kcorev1.Volume{{
+			Name: "data",
+			VolumeSource: kcorev1.VolumeSource{
+				NFS: &kcorev1.NFSVolumeSource{
+					Server: rj.Spec.DataServer,
+					Path:   rj.Spec.DataPath,
+				},
+			},
+		}}
+		job.Spec.Template.Spec.Containers[0].VolumeMounts = []kcorev1.VolumeMount{{
+			MountPath: "/data",
+			Name:      "data",
+		}}
+	}
+
+	ctrl.SetControllerReference(rj, job, r.Scheme)
 
 	return job
 }
