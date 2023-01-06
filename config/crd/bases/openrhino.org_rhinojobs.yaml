@@ -51,19 +51,25 @@ spec:
                 type: array
               appExec:
                 type: string
+              dataPath:
+                type: string
+              image:
+                type: string
               parallelism:
                 default: 1
                 format: int32
                 minimum: 1
                 type: integer
+              server:
+                type: string
               ttl:
-                default: 0
+                default: 10
                 format: int32
                 minimum: 0
                 type: integer
             required:
-            - appArgs
             - appExec
+            - image
             type: object
           status:
             description: RhinoJobStatus defines the observed state of RhinoJob

@@ -1,0 +1,20 @@
+apiVersion: openrhino.org/v1alpha1
+kind: RhinoJob
+metadata:
+  labels:
+    app.kubernetes.io/name: rhinojob
+    app.kubernetes.io/instance: rhinojob-grape
+    app.kubernetes.io/part-of: rhino-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: rhino-operator
+  name: rhinojob-grape
+spec:
+  image: "zhuhe0321/libgrape"
+  ttl: 3
+  parallelism: 2
+  appExec: "./libgrape"
+  appArgs: ["--vfile", "/data/p2p-31.v","--efile", "/data/p2p-31.e",
+          "--application", "sssp", "--sssp_source", "6", 
+          "--out_prefix", "/data/output_sssp", "--directed"]
+  server: "10.0.0.7"
+  dataPath: "/kfnmck56"

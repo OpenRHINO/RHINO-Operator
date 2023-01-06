@@ -28,16 +28,19 @@ type RhinoJobSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	Image string `json:"image"`
 	// +optional
 	// +kubebuilder:validation:Minimum:=1
 	// +kubebuilder:default:=1
 	Parallelism *int32 `json:"parallelism,omitempty"`
 	// +optional
 	// +kubebuilder:validation:Minimum:=0
-	// +kubebuilder:default:=0
-	TTL     *int32   `json:"ttl,omitempty"`
-	AppExec string   `json:"appExec"`
-	AppArgs []string `json:"appArgs"`
+	// +kubebuilder:default:=10
+	TTL      *int32   `json:"ttl,omitempty"`
+	AppExec  string   `json:"appExec"`
+	AppArgs  []string `json:"appArgs,omitempty"`
+	Server   string   `json:"server,omitempty"`
+	DataPath string   `json:"dataPath,omitempty"`
 }
 
 // RhinoJobStatus defines the observed state of RhinoJob
