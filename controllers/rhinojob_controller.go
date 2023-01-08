@@ -88,26 +88,38 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, err
 		}
 		logger.Info("Controller job created", "job", ctlJob)
-		time.Sleep(10 * time.Second) //等待主控服务进程可用
-
-		//构造 Workers Job
-		workersJob := r.constructWorkersJob(&rhinojob, ctx)
-		if err := r.Create(ctx, workersJob); err != nil && !errors.IsAlreadyExists(err) {
-			logger.Error(err, "Unable to create workers job for RhinoJob", "Job", workersJob)
-			return ctrl.Result{}, err
+		if errGetCtlJob != nil && !errors.IsNotFound(errGetCtlJob) { //主控 Job 获取失败，且原因也不是“该资源不存在”
+			logger.Error(errGetCtlJob, "Failed to get controller job")
+			return ctrl.Result{}, errGetCtlJob
 		}
-		logger.Info("Workers job created", "job", workersJob)
-
-		return ctrl.Result{Requeue: true}, nil //两个 Jobs 都创建成功，重新排进队列以便后续操作
-	}
-
-	if errGetCtlJob != nil && !errors.IsNotFound(errGetCtlJob) { //主控 Job 获取失败，且原因也不是“该资源不存在”
-		logger.Error(errGetCtlJob, "Failed to get controller job")
-		return ctrl.Result{}, errGetCtlJob
-	}
-	if errGetWorkersJob != nil && !errors.IsNotFound(errGetWorkersJob) { //Workers Job 获取失败，且原因也不是“该资源不存在”
-		logger.Error(errGetWorkersJob, "Failed to get workers job")
-		return ctrl.Result{}, errGetWorkersJob
+		ctlPodLabels := labelsForCtlPod(rhinojob.Name)
+		var foundPodList kcorev1.PodList
+		initTTL := 0
+		for {
+			time.Sleep(1 * time.Second)
+			initTTL += 1
+			if err := r.List(ctx, &foundPodList, client.MatchingLabels(ctlPodLabels)); err != nil {
+				continue
+			}
+			podStatus := foundPodList.Items[0].Status.Conditions[1].Status
+			if podStatus == "True" {
+				//构造 Workers Job
+				workersJob := r.constructWorkersJob(&rhinojob, ctx)
+				if err := r.Create(ctx, workersJob); err != nil && !errors.IsAlreadyExists(err) {
+					logger.Error(err, "Unable to create workers job for RhinoJob", "Job", workersJob)
+					return ctrl.Result{}, err
+				}
+				logger.Info("Workers job created", "job", workersJob)
+				if errGetWorkersJob != nil && !errors.IsNotFound(errGetWorkersJob) { //Workers Job 获取失败，且原因也不是“该资源不存在”
+					logger.Error(errGetWorkersJob, "Failed to get workers job")
+					return ctrl.Result{}, errGetWorkersJob
+				}
+				return ctrl.Result{}, nil
+			} else if initTTL > 15 {
+				logger.Info("MPI controller failed", "podStatus", podStatus)
+				break
+			}
+		}
 	}
 
 	//更新 status
@@ -185,6 +197,15 @@ func (r *RhinoJobReconciler) constructCtlJob(rj *rhinooprapiv1alpha1.RhinoJob) *
 						Name:    "rhino-mpi-controller",
 						Command: []string{"mpirun"},
 						Args:    cmdArgs,
+						ReadinessProbe: &kcorev1.Probe{
+							ProbeHandler: kcorev1.ProbeHandler{
+								Exec: &kcorev1.ExecAction{
+									Command: []string{"/bin/sh", "-c", "echo MPI controller not ready!;netstat -tunlp | grep -q 20000"},
+								},
+							},
+							PeriodSeconds:    1,
+							FailureThreshold: 10,
+						},
 					}},
 					RestartPolicy: "Never",
 				},
