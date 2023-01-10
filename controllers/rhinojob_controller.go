@@ -88,19 +88,20 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, err
 		}
 		logger.Info("Controller job created", "job", ctlJob)
-		if errGetCtlJob != nil && !errors.IsNotFound(errGetCtlJob) { //主控 Job 获取失败，且原因也不是“该资源不存在”
-			logger.Error(errGetCtlJob, "Failed to get controller job")
-			return ctrl.Result{}, errGetCtlJob
-		}
+	}
+	if errGetCtlJob != nil && !errors.IsNotFound(errGetCtlJob) { //主控 Job 获取失败，且原因也不是“该资源不存在”
+		logger.Error(errGetCtlJob, "Failed to get controller job")
+		return ctrl.Result{}, errGetCtlJob
+	}
+
+	if errors.IsNotFound(errGetWorkersJob) {
 		ctlPodLabels := labelsForCtlPod(rhinojob.Name)
 		var foundPodList kcorev1.PodList
-		initTTL := 0
-		for {
-			time.Sleep(1 * time.Second)
-			initTTL += 1
-			if err := r.List(ctx, &foundPodList, client.MatchingLabels(ctlPodLabels)); err != nil {
-				continue
-			}
+		if err := r.List(ctx, &foundPodList, client.MatchingLabels(ctlPodLabels)); err != nil {
+			logger.Error(err, "Unable find pod list")
+			return ctrl.Result{}, err
+		}
+		if len(foundPodList.Items) != 0 && foundPodList.Items[0].Status.Phase == "Running" {
 			podStatus := foundPodList.Items[0].Status.Conditions[1].Status
 			if podStatus == "True" {
 				//构造 Workers Job
@@ -110,16 +111,13 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 					return ctrl.Result{}, err
 				}
 				logger.Info("Workers job created", "job", workersJob)
-				if errGetWorkersJob != nil && !errors.IsNotFound(errGetWorkersJob) { //Workers Job 获取失败，且原因也不是“该资源不存在”
-					logger.Error(errGetWorkersJob, "Failed to get workers job")
-					return ctrl.Result{}, errGetWorkersJob
-				}
 				return ctrl.Result{}, nil
-			} else if initTTL > 15 {
-				logger.Info("MPI controller failed", "podStatus", podStatus)
-				break
 			}
 		}
+	}
+	if errGetWorkersJob != nil && !errors.IsNotFound(errGetWorkersJob) { //Workers Job 获取失败，且原因也不是“该资源不存在”
+		logger.Error(errGetWorkersJob, "Failed to get workers job")
+		return ctrl.Result{}, errGetWorkersJob
 	}
 
 	//更新 status
