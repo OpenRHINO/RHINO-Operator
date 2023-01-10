@@ -195,14 +195,14 @@ func (r *RhinoJobReconciler) constructCtlJob(rj *rhinooprapiv1alpha1.RhinoJob) *
 						Name:    "rhino-mpi-controller",
 						Command: []string{"mpirun"},
 						Args:    cmdArgs,
-						ReadinessProbe: &kcorev1.Probe{
+						StartupProbe: &kcorev1.Probe{
 							ProbeHandler: kcorev1.ProbeHandler{
 								Exec: &kcorev1.ExecAction{
 									Command: []string{"/bin/sh", "-c", "echo MPI controller not ready!;netstat -tunlp | grep -q 20000"},
 								},
 							},
 							PeriodSeconds:    1,
-							FailureThreshold: 10,
+							FailureThreshold: 15,
 						},
 					}},
 					RestartPolicy: "Never",
