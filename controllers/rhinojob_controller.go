@@ -88,22 +88,32 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, err
 		}
 		logger.Info("Controller job created", "job", ctlJob)
-		time.Sleep(10 * time.Second) //等待主控服务进程可用
-
-		//构造 Workers Job
-		workersJob := r.constructWorkersJob(&rhinojob, ctx)
-		if err := r.Create(ctx, workersJob); err != nil && !errors.IsAlreadyExists(err) {
-			logger.Error(err, "Unable to create workers job for RhinoJob", "Job", workersJob)
-			return ctrl.Result{}, err
-		}
-		logger.Info("Workers job created", "job", workersJob)
-
-		return ctrl.Result{Requeue: true}, nil //两个 Jobs 都创建成功，重新排进队列以便后续操作
 	}
-
 	if errGetCtlJob != nil && !errors.IsNotFound(errGetCtlJob) { //主控 Job 获取失败，且原因也不是“该资源不存在”
 		logger.Error(errGetCtlJob, "Failed to get controller job")
 		return ctrl.Result{}, errGetCtlJob
+	}
+
+	if errors.IsNotFound(errGetWorkersJob) {
+		ctlPodLabels := labelsForCtlPod(rhinojob.Name)
+		var foundPodList kcorev1.PodList
+		if err := r.List(ctx, &foundPodList, client.MatchingLabels(ctlPodLabels)); err != nil {
+			logger.Error(err, "Unable find pod list")
+			return ctrl.Result{}, err
+		}
+		if len(foundPodList.Items) != 0 && foundPodList.Items[0].Status.Phase == "Running" {
+			podStatus := foundPodList.Items[0].Status.Conditions[1].Status
+			if podStatus == "True" {
+				//构造 Workers Job
+				workersJob := r.constructWorkersJob(&rhinojob, ctx)
+				if err := r.Create(ctx, workersJob); err != nil && !errors.IsAlreadyExists(err) {
+					logger.Error(err, "Unable to create workers job for RhinoJob", "Job", workersJob)
+					return ctrl.Result{}, err
+				}
+				logger.Info("Workers job created", "job", workersJob)
+				return ctrl.Result{}, nil
+			}
+		}
 	}
 	if errGetWorkersJob != nil && !errors.IsNotFound(errGetWorkersJob) { //Workers Job 获取失败，且原因也不是“该资源不存在”
 		logger.Error(errGetWorkersJob, "Failed to get workers job")
@@ -185,6 +195,15 @@ func (r *RhinoJobReconciler) constructCtlJob(rj *rhinooprapiv1alpha1.RhinoJob) *
 						Name:    "rhino-mpi-controller",
 						Command: []string{"mpirun"},
 						Args:    cmdArgs,
+						StartupProbe: &kcorev1.Probe{
+							ProbeHandler: kcorev1.ProbeHandler{
+								Exec: &kcorev1.ExecAction{
+									Command: []string{"/bin/sh", "-c", "echo MPI controller not ready!;netstat -tunlp | grep -q 20000"},
+								},
+							},
+							PeriodSeconds:    1,
+							FailureThreshold: 15,
+						},
 					}},
 					RestartPolicy: "Never",
 				},
