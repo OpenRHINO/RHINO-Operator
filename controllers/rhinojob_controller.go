@@ -69,35 +69,39 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	var foundCtlJob kbatchv1.Job
+	var foundLauncherJob kbatchv1.Job
 	var foundWorkersJob kbatchv1.Job
-	//获取该 RhinoJob 对应的 MPI controller Job 和 workers job，若都不存在，则创建它们
-	//若只有一个不存在，另一个正常运行，则不做任何处理，因为这种情况只有三种可能：1. 刚要创建某个job，还查不到；2. 故障导致上次该job创建失败；3. 因人为、故障或其他原因导致删除。
-	//这三种可能都不应当重新触发创建流程：对于情况1，让它继续运行就好；情况2 或 情况3，即一个如果没了，只有另一个在，重新创建出来也意义也不大，大概率是连不上，或者任务仍然会失败，
-	//然而如果人为把这另一个job也删掉，作为修复故障的手段是OK的，这就是让这个rhinojob重新跑
-	errGetCtlJob := r.Get(ctx, types.NamespacedName{Namespace: rhinojob.Namespace, Name: nameForCtl(rhinojob.Name)}, &foundCtlJob)
+
+	// 获取该 RhinoJob 对应的 MPI launcher Job 和 workers job，若都不存在，则创建它们
+	// 若只有一个不存在，另一个正常运行，则不做任何处理，因为这种情况只有三种可能：
+	// 1. 刚要创建某个job，还查不到
+	// 2. 故障导致上次该job创建失败
+	// 3. 因人为、故障或其他原因导致删除。
+	// 这三种可能都不应当重新触发创建流程：对于情况1，让它继续运行就好；情况2 或 情况3，即一个如果没了，只有另一个在，重新创建出来也意义也不大，大概率是连不上，或者任务仍然会失败，
+	// 然而如果人为把这另一个job也删掉，作为修复故障的手段是OK的，这就是让这个rhinojob重新跑
+	errGetLauncherJob := r.Get(ctx, types.NamespacedName{Namespace: rhinojob.Namespace, Name: nameForLauncherJob(rhinojob.Name)}, &foundLauncherJob)
 	errGetWorkersJob := r.Get(ctx, types.NamespacedName{Namespace: rhinojob.Namespace, Name: nameForWorkersJob(rhinojob.Name)}, &foundWorkersJob)
 
-	if errors.IsNotFound(errGetCtlJob) && errors.IsNotFound(errGetWorkersJob) { //主控 Job 和 workers Job 都不存在
-		// 根据获取的 RhinoJob，构造主控 Job
-		ctlJob := r.constructCtlJob(&rhinojob)
-		// 创建主控 Job
-		if err := r.Create(ctx, ctlJob); err != nil && !errors.IsAlreadyExists(err) {
-			//若主控 Job 创建失败，而且失败原因也不是“资源已存在”，报错并返回错误
-			logger.Error(err, "Unable to create controller job for RhinoJob", "Job", ctlJob)
+	if errors.IsNotFound(errGetLauncherJob) && errors.IsNotFound(errGetWorkersJob) { // Launcher Job 和 workers Job 都不存在
+		// 根据获取的 RhinoJob，构造Launcher Job
+		launcherJob := r.constructLauncherJob(&rhinojob)
+		// 创建Launcher Job
+		if err := r.Create(ctx, launcherJob); err != nil && !errors.IsAlreadyExists(err) {
+			//若Launcher Job 创建失败，而且失败原因也不是“资源已存在”，报错并返回错误
+			logger.Error(err, "Unable to create launcher job for RhinoJob", "Job", launcherJob)
 			return ctrl.Result{}, err
 		}
-		logger.Info("Controller job created", "job", ctlJob)
+		logger.Info("Launcher job created", "job", launcherJob)
 	}
-	if errGetCtlJob != nil && !errors.IsNotFound(errGetCtlJob) { //主控 Job 获取失败，且原因也不是“该资源不存在”
-		logger.Error(errGetCtlJob, "Failed to get controller job")
-		return ctrl.Result{}, errGetCtlJob
+	if errGetLauncherJob != nil && !errors.IsNotFound(errGetLauncherJob) { // Launcher Job 获取失败，且原因也不是“该资源不存在”
+		logger.Error(errGetLauncherJob, "Failed to get launcher job")
+		return ctrl.Result{}, errGetLauncherJob
 	}
 
 	if errors.IsNotFound(errGetWorkersJob) {
-		ctlPodLabels := labelsForCtlPod(rhinojob.Name)
+		launcherPodLabels := labelsForLauncherPod(rhinojob.Name)
 		var foundPodList kcorev1.PodList
-		if err := r.List(ctx, &foundPodList, client.MatchingLabels(ctlPodLabels)); err != nil {
+		if err := r.List(ctx, &foundPodList, client.MatchingLabels(launcherPodLabels)); err != nil {
 			logger.Error(err, "Unable find pod list")
 			return ctrl.Result{}, err
 		}
@@ -120,13 +124,13 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, errGetWorkersJob
 	}
 
-	//更新 status
-	if errGetCtlJob != nil || errGetWorkersJob != nil {
+	// 更新 status
+	if errGetLauncherJob != nil || errGetWorkersJob != nil {
 		rhinojob.Status.JobStatus = rhinooprapiv1alpha1.Pending
 	} else {
-		if foundWorkersJob.Status.Failed+foundCtlJob.Status.Failed > 0 {
+		if foundWorkersJob.Status.Failed+foundLauncherJob.Status.Failed > 0 {
 			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.Failed
-		} else if foundWorkersJob.Status.Succeeded == *rhinojob.Spec.Parallelism && foundCtlJob.Status.Succeeded == 1 {
+		} else if foundWorkersJob.Status.Succeeded == *rhinojob.Spec.Parallelism && foundLauncherJob.Status.Succeeded == 1 {
 			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.Completed
 		} else {
 			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.Running
@@ -137,13 +141,13 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	//处理 TTL
+	// 处理 TTL
 	if *rhinojob.Spec.TTL > 0 {
-		ttl_left := rhinojob.CreationTimestamp.Add(time.Second * time.Duration(*rhinojob.Spec.TTL)).Sub(time.Now())
+		// ttl_left := rhinojob.CreationTimestamp.Add(time.Second * time.Duration(*rhinojob.Spec.TTL)).Sub(time.Now())
+		ttl_left := time.Until(rhinojob.CreationTimestamp.Add(time.Second * time.Duration(*rhinojob.Spec.TTL)))
 		if ttl_left > 0 {
 			return ctrl.Result{RequeueAfter: ttl_left}, nil
-		}
-		if ttl_left < 0 {
+		} else {
 			r.Delete(ctx, &rhinojob)
 		}
 	}
@@ -151,26 +155,26 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, nil
 }
 
-// 主控 Job 的名称
-func nameForCtl(rhinoJobName string) string {
-	return rhinoJobName + "-controller"
+// Launcher Job 的名称
+func nameForLauncherJob(rhinoJobName string) string {
+	return rhinoJobName + "-launcher"
 }
 
-// 主控 Pod 的 Labels，也是后续寻址 主控 Pod 的 Selector
-func labelsForCtlPod(rhinoJobName string) map[string]string {
-	return map[string]string{"app": rhinoJobName, "type": "controller"}
+// Launcher Pod 的 Labels，也是后续寻址 Launcher Pod 的 Selector
+func labelsForLauncherPod(rhinoJobName string) map[string]string {
+	return map[string]string{"app": rhinoJobName, "type": "launcher"}
 }
 
 func nameForWorkersJob(rhinoJobName string) string {
 	return rhinoJobName + "-workers"
 }
 
-// 构造主控Job
-func (r *RhinoJobReconciler) constructCtlJob(rj *rhinooprapiv1alpha1.RhinoJob) *kbatchv1.Job {
-	name := nameForCtl(rj.Name)
-	controllerPodLabels := labelsForCtlPod(rj.Name)
+// 构造Launcher Job
+func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJob) *kbatchv1.Job {
+	name := nameForLauncherJob(rj.Name)
+	launcherPodLabels := labelsForLauncherPod(rj.Name)
 
-	// 构造主控进程的命令行
+	// 构造 Launcher 进程的命令行
 	hostsIDs := "0"
 	for i := 1; i < int(*rj.Spec.Parallelism); i++ {
 		hostsIDs = fmt.Sprintf("%s, %d", hostsIDs, i)
@@ -178,7 +182,7 @@ func (r *RhinoJobReconciler) constructCtlJob(rj *rhinooprapiv1alpha1.RhinoJob) *
 	cmdArgs := append([]string{"-launcher", "manual", "-verbose", "-disable-hostname-propagation", "-hosts", hostsIDs,
 		rj.Spec.AppExec}, rj.Spec.AppArgs...)
 
-	// 构造主控 Job
+	// 构造 Launcher Job
 	job := &kbatchv1.Job{
 		ObjectMeta: kmetav1.ObjectMeta{
 			Name:      name,
@@ -187,18 +191,18 @@ func (r *RhinoJobReconciler) constructCtlJob(rj *rhinooprapiv1alpha1.RhinoJob) *
 		Spec: kbatchv1.JobSpec{
 			Template: kcorev1.PodTemplateSpec{
 				ObjectMeta: kmetav1.ObjectMeta{
-					Labels: controllerPodLabels,
+					Labels: launcherPodLabels,
 				},
 				Spec: kcorev1.PodSpec{
 					Containers: []kcorev1.Container{{
 						Image:   rj.Spec.Image,
-						Name:    "rhino-mpi-controller",
+						Name:    "rhino-mpi-launcher",
 						Command: []string{"mpirun"},
 						Args:    cmdArgs,
 						StartupProbe: &kcorev1.Probe{
 							ProbeHandler: kcorev1.ProbeHandler{
 								Exec: &kcorev1.ExecAction{
-									Command: []string{"/bin/sh", "-c", "echo MPI controller not ready!;netstat -tunlp | grep -q 20000"},
+									Command: []string{"/bin/sh", "-c", "echo MPI launcher not ready!;netstat -tunlp | grep -q 20000"},
 								},
 							},
 							PeriodSeconds:    1,
@@ -218,10 +222,10 @@ func (r *RhinoJobReconciler) constructCtlJob(rj *rhinooprapiv1alpha1.RhinoJob) *
 // 构造 Workers Job
 func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha1.RhinoJob, ctx context.Context) *kbatchv1.Job {
 	name := nameForWorkersJob(rj.Name)
-	ctlPodLabels := labelsForCtlPod(rj.Name)
+	launcherPodLabels := labelsForLauncherPod(rj.Name)
 
 	var foundPodList kcorev1.PodList
-	r.List(ctx, &foundPodList, client.MatchingLabels(ctlPodLabels))
+	r.List(ctx, &foundPodList, client.MatchingLabels(launcherPodLabels))
 	completionMode := "Indexed"
 	cmdArgs := []string{"-c", "/usr/local/bin/hydra_pmi_proxy --control-port " + foundPodList.Items[0].Status.PodIP +
 		":20000 --debug --rmk user --launcher manual --demux poll --pgid 0 --retries 10 --usize -2 --proxy-id $JOB_COMPLETION_INDEX"}
