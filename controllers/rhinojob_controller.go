@@ -143,8 +143,7 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// 处理 TTL
 	if *rhinojob.Spec.TTL > 0 {
-		// ttl_left := rhinojob.CreationTimestamp.Add(time.Second * time.Duration(*rhinojob.Spec.TTL)).Sub(time.Now())
-		ttl_left := time.Until(rhinojob.CreationTimestamp.Add(time.Second * time.Duration(*rhinojob.Spec.TTL)))
+		ttl_left := rhinojob.CreationTimestamp.Add(time.Second * time.Duration(*rhinojob.Spec.TTL)).Sub(time.Now())
 		if ttl_left > 0 {
 			return ctrl.Result{RequeueAfter: ttl_left}, nil
 		} else {
