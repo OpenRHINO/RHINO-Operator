@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	kbatchv1 "k8s.io/api/batch/v1"
 	rhinooprapiv1alpha1 "openrhino.org/operator/api/v1alpha1"
 )
 
@@ -111,6 +112,20 @@ var _ = Describe("RhinoJob controller", func() {
 				NamespacedName: namespacedName,
 			})
 			Expect(err).To(Not(HaveOccurred()))
+
+			By("Checking if the launcher job was successfully created in the reconciliation")
+			Eventually(func() error {
+				found := &kbatchv1.Job{}
+				return k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-launcher", Namespace: RhinoJobName}, found)
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("Checking if the workers job was successfully created in the reconciliation")
+			Eventually(func() error {
+				found := &kbatchv1.Job{}
+				return k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-workers", Namespace: RhinoJobName}, found)
+			}, time.Minute, time.Second).Should(Succeed())
+
+			//TODO: check the final status of the launcher and workers jobs. And check the final status of the RhinoJob.
 		})
 	})
 })
