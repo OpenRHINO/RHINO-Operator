@@ -46,7 +46,7 @@ var _ = Describe("RhinoJob controller", func() {
 			},
 		}
 
-		typeNamespaceName := types.NamespacedName{Name: RhinoJobName, Namespace: RhinoJobName}
+		namespacedName := types.NamespacedName{Name: RhinoJobName, Namespace: RhinoJobName}
 
 		BeforeEach(func() {
 			By("Creating the Namespace to perform the tests")
@@ -71,7 +71,7 @@ var _ = Describe("RhinoJob controller", func() {
 		It("should successfully reconcile a custom resource for RhinoJob", func() {
 			By("Creating the custom resource for the Kind RhinoJob")
 			rhinojob := &rhinooprapiv1alpha1.RhinoJob{}
-			err := k8sClient.Get(ctx, typeNamespaceName, rhinojob)
+			err := k8sClient.Get(ctx, namespacedName, rhinojob)
 			if err != nil && errors.IsNotFound(err) {
 				// Let's mock our custom resource at the same way that we would
 				// apply on the cluster the manifest under config/samples
@@ -98,7 +98,7 @@ var _ = Describe("RhinoJob controller", func() {
 			By("Checking if the custom resource was successfully created")
 			Eventually(func() error {
 				found := &rhinooprapiv1alpha1.RhinoJob{}
-				return k8sClient.Get(ctx, typeNamespaceName, found)
+				return k8sClient.Get(ctx, namespacedName, found)
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Reconciling the custom resource created")
@@ -108,7 +108,7 @@ var _ = Describe("RhinoJob controller", func() {
 			}
 
 			_, err = rhinojobReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespaceName,
+				NamespacedName: namespacedName,
 			})
 			Expect(err).To(Not(HaveOccurred()))
 		})
