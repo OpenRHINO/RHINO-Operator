@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	kbatchv1 "k8s.io/api/batch/v1"
 	rhinooprapiv1alpha1 "openrhino.org/operator/api/v1alpha1"
@@ -115,6 +115,30 @@ var _ = Describe("RhinoJob controller", func() {
 			}, time.Minute, time.Second).Should(Succeed())
 
 			//TODO: check the final status of the launcher and workers jobs. And check the final status of the RhinoJob.
+			By("Checking the final status of launcher and workers jobs")
+			Eventually(func() error {
+				foundLauncherJob := &kbatchv1.Job{}
+				foundWorkersJob := &kbatchv1.Job{}
+
+				k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-launcher", Namespace: RhinoJobName}, foundLauncherJob)
+				k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-workers", Namespace: RhinoJobName}, foundWorkersJob)
+
+				if foundLauncherJob.Status.Succeeded == 1 && foundWorkersJob.Status.Succeeded == *rhinojob.Spec.Parallelism {
+					return nil
+				}
+				return fmt.Errorf("Jobs not completed")
+			}, 2*time.Minute, time.Second)
+
+			By("Checing the final status of rhinojob")
+			Eventually(func() error {
+				found := &rhinooprapiv1alpha1.RhinoJob{}
+				k8sClient.Get(ctx, namespacedName, found)
+
+				if found.Status.JobStatus == rhinooprapiv1alpha1.Completed {
+					return nil
+				}
+				return fmt.Errorf("Rhinojob not completed")
+			}, time.Minute, time.Second)
 		})
 	})
 })
