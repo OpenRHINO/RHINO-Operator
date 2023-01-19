@@ -102,17 +102,6 @@ var _ = Describe("RhinoJob controller", func() {
 				return k8sClient.Get(ctx, namespacedName, found)
 			}, time.Minute, time.Second).Should(Succeed())
 
-			By("Reconciling the custom resource created")
-			rhinojobReconciler := &RhinoJobReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
-
-			_, err = rhinojobReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: namespacedName,
-			})
-			Expect(err).To(Not(HaveOccurred()))
-
 			By("Checking if the launcher job was successfully created in the reconciliation")
 			Eventually(func() error {
 				found := &kbatchv1.Job{}
