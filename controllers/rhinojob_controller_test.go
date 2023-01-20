@@ -114,31 +114,42 @@ var _ = Describe("RhinoJob controller", func() {
 				return k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-workers", Namespace: RhinoJobName}, found)
 			}, time.Minute, time.Second).Should(Succeed())
 
-			//TODO: check the final status of the launcher and workers jobs. And check the final status of the RhinoJob.
+			By("Get current rhinojob object")
+			err = k8sClient.Get(ctx, namespacedName, rhinojob)
+			Expect(err).To(Not(HaveOccurred()))
+
 			By("Checking the final status of launcher and workers jobs")
 			Eventually(func() error {
-				foundLauncherJob := &kbatchv1.Job{}
-				foundWorkersJob := &kbatchv1.Job{}
+				foundLauncherJob := kbatchv1.Job{}
+				foundWorkersJob := kbatchv1.Job{}
 
-				k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-launcher", Namespace: RhinoJobName}, foundLauncherJob)
-				k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-workers", Namespace: RhinoJobName}, foundWorkersJob)
+				err1 := k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-launcher", Namespace: RhinoJobName}, &foundLauncherJob)
+				if err1 != nil {
+					return err1
+				}
+				err2 := k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-workers", Namespace: RhinoJobName}, &foundWorkersJob)
+				if err2 != nil {
+					return err2
+				}
 
 				if foundLauncherJob.Status.Succeeded == 1 && foundWorkersJob.Status.Succeeded == *rhinojob.Spec.Parallelism {
 					return nil
 				}
 				return fmt.Errorf("Jobs not completed")
-			}, 2*time.Minute, time.Second)
+			}, 2*time.Minute, time.Second).Should(Succeed())
 
 			By("Checing the final status of rhinojob")
 			Eventually(func() error {
-				found := &rhinooprapiv1alpha1.RhinoJob{}
-				k8sClient.Get(ctx, namespacedName, found)
+				err := k8sClient.Get(ctx, namespacedName, rhinojob)
+				if err != nil {
+					return err
+				}
 
-				if found.Status.JobStatus == rhinooprapiv1alpha1.Completed {
+				if rhinojob.Status.JobStatus == rhinooprapiv1alpha1.Completed {
 					return nil
 				}
 				return fmt.Errorf("Rhinojob not completed")
-			}, time.Minute, time.Second)
+			}, time.Minute, time.Second).Should(Succeed())
 		})
 	})
 })
