@@ -48,6 +48,8 @@ var _ = Describe("RhinoJob controller", func() {
 		}
 
 		namespacedName := types.NamespacedName{Name: RhinoJobName, Namespace: RhinoJobName}
+		namespacedNameLauncher := types.NamespacedName{Name: RhinoJobName + "-launcher", Namespace: RhinoJobName}
+		namespacedNameWorkers := types.NamespacedName{Name: RhinoJobName + "-workers", Namespace: RhinoJobName}
 
 		BeforeEach(func() {
 			By("Creating the Namespace to perform the tests")
@@ -105,13 +107,13 @@ var _ = Describe("RhinoJob controller", func() {
 			By("Checking if the launcher job was successfully created in the reconciliation")
 			Eventually(func() error {
 				found := &kbatchv1.Job{}
-				return k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-launcher", Namespace: RhinoJobName}, found)
+				return k8sClient.Get(ctx, namespacedNameLauncher, found)
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Checking if the workers job was successfully created in the reconciliation")
 			Eventually(func() error {
 				found := &kbatchv1.Job{}
-				return k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-workers", Namespace: RhinoJobName}, found)
+				return k8sClient.Get(ctx, namespacedNameWorkers, found)
 			}, time.Minute, time.Second).Should(Succeed())
 
 			By("Get current rhinojob object")
@@ -123,11 +125,11 @@ var _ = Describe("RhinoJob controller", func() {
 				foundLauncherJob := kbatchv1.Job{}
 				foundWorkersJob := kbatchv1.Job{}
 
-				err1 := k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-launcher", Namespace: RhinoJobName}, &foundLauncherJob)
+				err1 := k8sClient.Get(ctx, namespacedNameLauncher, &foundLauncherJob)
 				if err1 != nil {
 					return err1
 				}
-				err2 := k8sClient.Get(ctx, types.NamespacedName{Name: RhinoJobName + "-workers", Namespace: RhinoJobName}, &foundWorkersJob)
+				err2 := k8sClient.Get(ctx, namespacedNameWorkers, &foundWorkersJob)
 				if err2 != nil {
 					return err2
 				}
