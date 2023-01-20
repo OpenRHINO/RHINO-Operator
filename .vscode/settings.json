@@ -1,5 +1,6 @@
 {
   "go.toolsEnvVars": {
     "KUBEBUILDER_ASSETS": "${workspaceFolder}/bin/k8s/1.25.0-linux-amd64" 
-  }
+  },
+  "go.testTimeout": "180s"
 }
