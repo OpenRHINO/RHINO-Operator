@@ -122,14 +122,14 @@ var _ = Describe("RhinoJob controller", func() {
 
 			By("Checking the final status of launcher and workers jobs")
 			Eventually(func() error {
-				foundLauncherJob := kbatchv1.Job{}
-				foundWorkersJob := kbatchv1.Job{}
+				foundLauncherJob := &kbatchv1.Job{}
+				foundWorkersJob := &kbatchv1.Job{}
 
-				err1 := k8sClient.Get(ctx, namespacedNameLauncher, &foundLauncherJob)
+				err1 := k8sClient.Get(ctx, namespacedNameLauncher, foundLauncherJob)
 				if err1 != nil {
 					return err1
 				}
-				err2 := k8sClient.Get(ctx, namespacedNameWorkers, &foundWorkersJob)
+				err2 := k8sClient.Get(ctx, namespacedNameWorkers, foundWorkersJob)
 				if err2 != nil {
 					return err2
 				}
