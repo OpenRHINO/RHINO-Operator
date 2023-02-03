@@ -32,7 +32,7 @@ import (
 	kcorev1 "k8s.io/api/core/v1"
 	kmetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	rhinooprapiv1alpha1 "openrhino.org/operator/api/v1alpha1" //这里导入后的名字跟脚手架代码自动生成的不一样，这样改的原因是为了可读性更好
+	rhinooprapiv1alpha1 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha1" //这里导入后的名字跟脚手架代码自动生成的不一样，这样改的原因是为了可读性更好
 )
 
 // RhinoJobReconciler reconciles a RhinoJob object

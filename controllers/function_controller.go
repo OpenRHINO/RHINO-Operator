@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	openrhinoorgv1alpha1 "openrhino.org/operator/api/v1alpha1"
+	openrhinoorgv1alpha1 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha1"
 )
 
 // FunctionReconciler reconciles a Function object

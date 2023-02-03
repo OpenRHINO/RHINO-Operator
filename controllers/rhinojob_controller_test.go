@@ -29,8 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	rhinooprapiv1alpha1 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha1"
 	kbatchv1 "k8s.io/api/batch/v1"
-	rhinooprapiv1alpha1 "openrhino.org/operator/api/v1alpha1"
 )
 
 var _ = Describe("RhinoJob controller", func() {
