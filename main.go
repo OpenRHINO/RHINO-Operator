@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	openrhinoorgv1alpha1 "openrhino.org/operator/api/v1alpha1"
-	"openrhino.org/operator/controllers"
+	openrhinoorgv1alpha1 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha1"
+	"github.com/OpenRHINO/RHINO-Operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
 

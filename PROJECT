@@ -2,7 +2,7 @@ domain: openrhino.org
 layout:
 - go.kubebuilder.io/v3
 projectName: rhino-operator
-repo: openrhino.org/operator
+repo: github.com/OpenRHINO/RHINO-Operator
 resources:
 - api:
     crdVersion: v1
@@ -10,7 +10,7 @@ resources:
   controller: true
   domain: openrhino.org
   kind: Function
-  path: openrhino.org/operator/api/v1alpha1
+  path: github.com/OpenRHINO/RHINO-Operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -18,6 +18,6 @@ resources:
   controller: true
   domain: openrhino.org
   kind: RhinoJob
-  path: openrhino.org/operator/api/v1alpha1
+  path: github.com/OpenRHINO/RHINO-Operator/api/v1alpha1
   version: v1alpha1
 version: "3"

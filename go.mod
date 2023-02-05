@@ -1,4 +1,4 @@
-module openrhino.org/operator
+module github.com/OpenRHINO/RHINO-Operator
 
 go 1.19
 
