@@ -1,5 +1,10 @@
 # RHINO-Operator
 
+  Serverless模式在互联网领域和数字化应用中已经得到了生产级别的使用，但对于并行计算类应用支持目前仍然不足。大量并行计算类应用仍需要以传统方式进行开发、部署和运行，工作效率和硬件利用效率均有较大提升空间。
+  为解决该问题，我们提出了RHINO方案（seRverless HIgh performaNce cOmputing），包括：平台、框架和开发工具三个部分，在一些实际应用中得到反馈后，我们将部分代码重构并逐步开源，形成OpenRHINO。
+
+<img width="1300" alt="image" src="https://user-images.githubusercontent.com/20229719/216837309-4af11631-be1d-4cf3-8189-2e07a908af56.png">
+
 ## RhinoJob
 ### API访问示例
 ```
