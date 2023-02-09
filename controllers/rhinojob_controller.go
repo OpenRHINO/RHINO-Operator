@@ -27,7 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
+	"k8s.io/apimachinery/pkg/api/resource"
 	kbatchv1 "k8s.io/api/batch/v1"
 	kcorev1 "k8s.io/api/core/v1"
 	kmetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -244,8 +244,13 @@ func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha1.RhinoJo
 			Template: kcorev1.PodTemplateSpec{
 				Spec: kcorev1.PodSpec{
 					Containers: []kcorev1.Container{{
-						Image:   rj.Spec.Image,
-						Name:    "rhino-mpi-worker",
+						Image: rj.Spec.Image,
+						Name:  "rhino-mpi-worker",
+						Resources: kcorev1.ResourceRequirements{
+							Requests: kcorev1.ResourceList{
+								"cpu": resource.MustParse("1"),
+							},
+						},
 						Command: []string{"ash"},
 						Args:    cmdArgs,
 					}},
