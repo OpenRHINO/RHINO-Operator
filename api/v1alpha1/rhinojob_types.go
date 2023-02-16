@@ -36,11 +36,12 @@ type RhinoJobSpec struct {
 	// +optional
 	// +kubebuilder:validation:Minimum:=0
 	// +kubebuilder:default:=600
-	TTL        *int32   `json:"ttl,omitempty"`
-	AppExec    string   `json:"appExec"`
-	AppArgs    []string `json:"appArgs,omitempty"`
-	DataServer string   `json:"dataServer,omitempty"`
-	DataPath   string   `json:"dataPath,omitempty"`
+	TTL           *int32   `json:"ttl,omitempty"`
+	AppExec       string   `json:"appExec"`
+	AppArgs       []string `json:"appArgs,omitempty"`
+	DataServer    string   `json:"dataServer,omitempty"`
+	DataPath      string   `json:"dataPath,omitempty"`
+	SchedulerName string   `json:"schedulerName,omitempty"`
 }
 
 // RhinoJobStatus defines the observed state of RhinoJob

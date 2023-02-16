@@ -1,0 +1,30 @@
+# scheduler-plugins
+# https://github.com/kubernetes-sigs/scheduler-plugins/blob/master/manifests/install/charts/as-a-second-scheduler/README.md#installing-the-chart
+apiVersion: scheduling.sigs.k8s.io/v1alpha1
+kind: PodGroup
+metadata:
+  name: mpi
+spec:
+  scheduleTimeoutSeconds: 10
+  minMember: 4
+---
+apiVersion: openrhino.org/v1alpha1
+kind: RhinoJob
+metadata:
+  labels:
+    app.kubernetes.io/name: rhinojob
+    app.kubernetes.io/instance: rhinojob-integration
+    app.kubernetes.io/part-of: rhino-operator
+    app.kubernetes.io/managed-by: kustomize 
+    app.kubernetes.io/created-by: rhino-operator
+  name: rhinojob-integration
+spec:
+  schedulerName: scheduler-plugins-scheduler
+  image: "zhuhe0321/integration"
+  ttl: 300
+  parallelism: 4
+  appExec: "./integration"
+  appArgs: ["1", "10", "1"]
+
+
+

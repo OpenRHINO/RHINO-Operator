@@ -242,6 +242,9 @@ func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha1.RhinoJo
 			Completions:    rj.Spec.Parallelism,
 			Parallelism:    rj.Spec.Parallelism,
 			Template: kcorev1.PodTemplateSpec{
+				ObjectMeta: kmetav1.ObjectMeta{
+					Labels: map[string]string{"pod-group.scheduling.sigs.k8s.io": "mpi"},
+				},
 				Spec: kcorev1.PodSpec{
 					Containers: []kcorev1.Container{{
 						Image: rj.Spec.Image,
@@ -255,6 +258,7 @@ func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha1.RhinoJo
 						Args:    cmdArgs,
 					}},
 					RestartPolicy: "Never",
+					SchedulerName: rj.Spec.SchedulerName,
 				},
 			},
 		},

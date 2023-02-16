@@ -62,6 +62,8 @@ spec:
                 format: int32
                 minimum: 1
                 type: integer
+              schedulerName:
+                type: string
               ttl:
                 default: 600
                 format: int32
