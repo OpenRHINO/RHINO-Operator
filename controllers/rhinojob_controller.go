@@ -200,14 +200,15 @@ func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJ
 						Name:    "rhino-mpi-launcher",
 						Command: []string{"mpirun"},
 						Args:    cmdArgs,
-						StartupProbe: &kcorev1.Probe{
+						ReadinessProbe: &kcorev1.Probe{
 							ProbeHandler: kcorev1.ProbeHandler{
 								Exec: &kcorev1.ExecAction{
-									Command: []string{"/bin/sh", "-c", "echo MPI launcher not ready!;netstat -tunlp | grep -q 20000"},
+									Command: []string{"/bin/sh", "-c", "wget -O - --no-verbose --no-check-certificate https://kubernetes.default.svc/api/v1/namespaces/default/pods/$HOSTNAME/log?container=rhino-mpi-launcher --header \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" |grep HYDRA_LAUNCH_END"},
 								},
 							},
-							PeriodSeconds:    1,
-							FailureThreshold: 15,
+							InitialDelaySeconds: 1,
+							PeriodSeconds:       1,
+							FailureThreshold:    1,
 						},
 					}},
 					RestartPolicy: "Never",
