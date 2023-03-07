@@ -178,7 +178,7 @@ func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJ
 	// 构造 Launcher 进程的命令行
 	hostsIDs := "0"
 	for i := 1; i < int(*rj.Spec.Parallelism); i++ {
-		hostsIDs = fmt.Sprintf("%s, %d", hostsIDs, i)
+		hostsIDs = fmt.Sprintf("%s,%d", hostsIDs, i)
 	}
 	cmdArgs := append([]string{"-launcher", "manual", "-verbose", "-disable-hostname-propagation", "-hosts", hostsIDs,
 		rj.Spec.AppExec}, rj.Spec.AppArgs...)
