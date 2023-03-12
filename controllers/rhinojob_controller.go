@@ -81,12 +81,15 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// 3. 因人为、故障或其他原因导致删除。
 	// 这三种可能都不应当重新触发创建流程：对于情况1，让它继续运行就好；情况2 或 情况3，即一个如果没了，只有另一个在，重新创建出来也意义也不大，大概率是连不上，或者任务仍然会失败，
 	// 然而如果人为把这另一个job也删掉，作为修复故障的手段是OK的，这就是让这个rhinojob重新跑
-	errGetLauncherJob := r.Get(ctx, types.NamespacedName{Namespace: rhinojob.Namespace, Name: nameForLauncherJob(rhinojob.Name)}, &foundLauncherJob)
-	errGetWorkersJob := r.Get(ctx, types.NamespacedName{Namespace: rhinojob.Namespace, Name: nameForWorkersJob(rhinojob.Name)}, &foundWorkersJob)
+	errGetLauncherJob := r.Get(ctx, types.NamespacedName{Namespace: rhinojob.Namespace, Name: nameForLauncherJob(&rhinojob)}, &foundLauncherJob)
+	errGetWorkersJob := r.Get(ctx, types.NamespacedName{Namespace: rhinojob.Namespace, Name: nameForWorkersJob(&rhinojob)}, &foundWorkersJob)
 
 	if errors.IsNotFound(errGetLauncherJob) && errors.IsNotFound(errGetWorkersJob) { // Launcher Job 和 workers Job 都不存在
 		// 根据获取的 RhinoJob，构造Launcher Job
-		launcherJob := r.constructLauncherJob(&rhinojob)
+		launcherJob, err := r.constructLauncherJob(&rhinojob)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 		// 创建Launcher Job
 		if err := r.Create(ctx, launcherJob); err != nil && !errors.IsAlreadyExists(err) {
 			//若Launcher Job 创建失败，而且失败原因也不是“资源已存在”，报错并返回错误
@@ -101,7 +104,7 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if errors.IsNotFound(errGetWorkersJob) {
-		launcherPodLabels := labelsForLauncherPod(rhinojob.Name)
+		launcherPodLabels := labelsForLauncherPod(&rhinojob)
 		var foundPodList kcorev1.PodList
 		if err := r.List(ctx, &foundPodList, client.MatchingLabels(launcherPodLabels)); err != nil {
 			logger.Error(err, "Unable find pod list")
@@ -111,7 +114,10 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			podStatus := foundPodList.Items[0].Status.Conditions[1].Status
 			if podStatus == "True" {
 				//构造 Workers Job
-				workersJob := r.constructWorkersJob(&rhinojob, ctx)
+				workersJob, err := r.constructWorkersJob(&rhinojob, ctx)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
 				if err := r.Create(ctx, workersJob); err != nil && !errors.IsAlreadyExists(err) {
 					logger.Error(err, "Unable to create workers job for RhinoJob", "Job", workersJob)
 					return ctrl.Result{}, err
@@ -157,23 +163,23 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 // Launcher Job 的名称
-func nameForLauncherJob(rhinoJobName string) string {
-	return rhinoJobName + "-launcher"
+func nameForLauncherJob(rj *rhinooprapiv1alpha1.RhinoJob) string {
+	return rj.Name + "-" + string(rj.UID)[:5] + "-launcher"
 }
 
 // Launcher Pod 的 Labels，也是后续寻址 Launcher Pod 的 Selector
-func labelsForLauncherPod(rhinoJobName string) map[string]string {
-	return map[string]string{"app": rhinoJobName, "type": "launcher"}
+func labelsForLauncherPod(rj *rhinooprapiv1alpha1.RhinoJob) map[string]string {
+	return map[string]string{"app": rj.Name, "type": "launcher", "rhinoID": string(rj.UID)}
 }
 
-func nameForWorkersJob(rhinoJobName string) string {
-	return rhinoJobName + "-workers"
+func nameForWorkersJob(rj *rhinooprapiv1alpha1.RhinoJob) string {
+	return rj.Name + "-" + string(rj.UID)[:5] + "-workers"
 }
 
 // 构造Launcher Job
-func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJob) *kbatchv1.Job {
-	name := nameForLauncherJob(rj.Name)
-	launcherPodLabels := labelsForLauncherPod(rj.Name)
+func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJob) (*kbatchv1.Job, error) {
+	name := nameForLauncherJob(rj)
+	launcherPodLabels := labelsForLauncherPod(rj)
 
 	// 构造 Launcher 进程的命令行
 	hostsIDs := "0"
@@ -215,15 +221,15 @@ func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJ
 			},
 		},
 	}
-	ctrl.SetControllerReference(rj, job, r.Scheme)
+	err := ctrl.SetControllerReference(rj, job, r.Scheme)
 
-	return job
+	return job, err
 }
 
 // 构造 Workers Job
-func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha1.RhinoJob, ctx context.Context) *kbatchv1.Job {
-	name := nameForWorkersJob(rj.Name)
-	launcherPodLabels := labelsForLauncherPod(rj.Name)
+func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha1.RhinoJob, ctx context.Context) (*kbatchv1.Job, error) {
+	name := nameForWorkersJob(rj)
+	launcherPodLabels := labelsForLauncherPod(rj)
 
 	var foundPodList kcorev1.PodList
 	r.List(ctx, &foundPodList, client.MatchingLabels(launcherPodLabels))
@@ -271,9 +277,9 @@ func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha1.RhinoJo
 		}}
 	}
 
-	ctrl.SetControllerReference(rj, job, r.Scheme)
+	err := ctrl.SetControllerReference(rj, job, r.Scheme)
 
-	return job
+	return job, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
