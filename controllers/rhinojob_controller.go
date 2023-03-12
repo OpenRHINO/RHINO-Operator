@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -30,7 +31,6 @@ import (
 
 	kbatchv1 "k8s.io/api/batch/v1"
 	kcorev1 "k8s.io/api/core/v1"
-	krbacv1 "k8s.io/api/rbac/v1"
 	kmetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	rhinooprapiv1alpha1 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha1" //这里导入后的名字跟脚手架代码自动生成的不一样，这样改的原因是为了可读性更好
@@ -70,11 +70,6 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 		logger.Error(err, "Failed to get RhinoJob")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
-	if err := r.configRBACforReadinessProbe(ctx, &rhinojob); err != nil {
-		logger.Error(err, "Failed to config RBAC")
-		return ctrl.Result{}, err
 	}
 
 	var foundLauncherJob kbatchv1.Job
@@ -162,74 +157,6 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, nil
 }
 
-func (r *RhinoJobReconciler) configRBACforReadinessProbe(ctx context.Context, rj *rhinooprapiv1alpha1.RhinoJob) error {
-	// Define the ClusterRole object
-	clusterRoleLogReader := &krbacv1.ClusterRole{
-		ObjectMeta: kmetav1.ObjectMeta{
-			Name: "log-reader",
-		},
-		Rules: []krbacv1.PolicyRule{
-			{
-				APIGroups: []string{""},
-				Resources: []string{"pods/log"},
-				Verbs:     []string{"get", "list"},
-			},
-		},
-	}
-	if err := r.Create(ctx, clusterRoleLogReader); err != nil {
-		if errors.IsAlreadyExists(err) {
-			err = r.Update(ctx, clusterRoleLogReader)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	// Define the ServiceAccount object
-	serviceAccountRhinoLauncher := &kcorev1.ServiceAccount{
-		ObjectMeta: kmetav1.ObjectMeta{
-			Name: "rhino-launcher",
-		},
-	}
-	if err := r.Create(ctx, serviceAccountRhinoLauncher); err != nil {
-		if errors.IsAlreadyExists(err) {
-			err = r.Update(ctx, serviceAccountRhinoLauncher)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	// Define the ClusterRoleBinding object
-	clusterRoleBindingRhinoLauncher := &krbacv1.ClusterRoleBinding{
-		ObjectMeta: kmetav1.ObjectMeta{
-			Name: "rhino-launcher-clusterrolebinding",
-		},
-		Subjects: []krbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      "rhino-launcher",
-				Namespace: rj.Namespace,
-			},
-		},
-		RoleRef: krbacv1.RoleRef{
-			Kind:     "ClusterRole",
-			Name:     "log-reader",
-			APIGroup: "rbac.authorization.k8s.io",
-		},
-	}
-	if err := r.Create(ctx, clusterRoleBindingRhinoLauncher); err != nil {
-		if errors.IsAlreadyExists(err) {
-			err = r.Update(ctx, clusterRoleBindingRhinoLauncher)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 // Launcher Job 的名称
 func nameForLauncherJob(rhinoJobName string) string {
 	return rhinoJobName + "-launcher"
@@ -250,12 +177,15 @@ func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJ
 	launcherPodLabels := labelsForLauncherPod(rj.Name)
 
 	// 构造 Launcher 进程的命令行
-	hostsIDs := "0"
+	hostsIDs := "'0"
 	for i := 1; i < int(*rj.Spec.Parallelism); i++ {
 		hostsIDs = fmt.Sprintf("%s,%d", hostsIDs, i)
 	}
-	cmdArgs := append([]string{"-launcher", "manual", "-verbose", "-disable-hostname-propagation", "-hosts", hostsIDs,
+	hostsIDs = hostsIDs + "'" // 需要加上单引号，否则 mpirun 会报错，hostsIDs = "'0,1,2,3'" for --np=10
+	cmdArgs := append([]string{"mpirun", "-launcher", "manual", "-verbose", "-disable-hostname-propagation", "-hosts", hostsIDs,
 		rj.Spec.AppExec}, rj.Spec.AppArgs...)
+	cmdArgs = append(cmdArgs, "|", "tee", "/tmp/rhino-launcher.log")
+	cmdArgString := strings.Join(cmdArgs, " ")
 
 	// 构造 Launcher Job
 	job := &kbatchv1.Job{
@@ -269,19 +199,15 @@ func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJ
 					Labels: launcherPodLabels,
 				},
 				Spec: kcorev1.PodSpec{
-					ServiceAccountName: "rhino-launcher",
 					Containers: []kcorev1.Container{{
 						Image:   rj.Spec.Image,
 						Name:    "rhino-mpi-launcher",
-						Command: []string{"mpirun"},
-						Args:    cmdArgs,
+						Command: []string{"/bin/sh", "-c"},
+						Args:    []string{cmdArgString},
 						ReadinessProbe: &kcorev1.Probe{
 							ProbeHandler: kcorev1.ProbeHandler{
 								Exec: &kcorev1.ExecAction{
-									Command: []string{"/bin/sh", "-c", "wget -O - --no-verbose --no-check-certificate " +
-										"https://kubernetes.default.svc/api/v1/namespaces/default/pods/$HOSTNAME/log?container=rhino-mpi-launcher " +
-										"--header \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" " +
-										"| grep HYDRA_LAUNCH_END"},
+									Command: []string{"/bin/sh", "-c", "cat /tmp/rhino-launcher.log | grep HYDRA_LAUNCH_END"},
 								},
 							},
 							InitialDelaySeconds: 1,
@@ -289,7 +215,7 @@ func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJ
 							FailureThreshold:    1,
 						},
 					}},
-					RestartPolicy: "Never",
+					RestartPolicy: "OnFailure",
 				},
 			},
 		},
