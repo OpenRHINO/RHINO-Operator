@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -176,12 +177,15 @@ func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJ
 	launcherPodLabels := labelsForLauncherPod(rj.Name)
 
 	// 构造 Launcher 进程的命令行
-	hostsIDs := "0"
+	hostsIDs := "'0"
 	for i := 1; i < int(*rj.Spec.Parallelism); i++ {
 		hostsIDs = fmt.Sprintf("%s,%d", hostsIDs, i)
 	}
-	cmdArgs := append([]string{"-launcher", "manual", "-verbose", "-disable-hostname-propagation", "-hosts", hostsIDs,
+	hostsIDs = hostsIDs + "'" // 需要加上单引号，否则 mpirun 会报错，hostsIDs = "'0,1,2,3'" for --np=4
+	cmdArgs := append([]string{"mpirun", "-launcher", "manual", "-verbose", "-disable-hostname-propagation", "-hosts", hostsIDs,
 		rj.Spec.AppExec}, rj.Spec.AppArgs...)
+	cmdArgs = append(cmdArgs, "|", "tee", "/tmp/rhino-launcher.log")
+	cmdArgString := strings.Join(cmdArgs, " ")
 
 	// 构造 Launcher Job
 	job := &kbatchv1.Job{
@@ -198,19 +202,20 @@ func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJ
 					Containers: []kcorev1.Container{{
 						Image:   rj.Spec.Image,
 						Name:    "rhino-mpi-launcher",
-						Command: []string{"mpirun"},
-						Args:    cmdArgs,
-						StartupProbe: &kcorev1.Probe{
+						Command: []string{"/bin/sh", "-c"},
+						Args:    []string{cmdArgString},
+						ReadinessProbe: &kcorev1.Probe{
 							ProbeHandler: kcorev1.ProbeHandler{
 								Exec: &kcorev1.ExecAction{
-									Command: []string{"/bin/sh", "-c", "echo MPI launcher not ready!;netstat -tunlp | grep -q 20000"},
+									Command: []string{"/bin/sh", "-c", "cat /tmp/rhino-launcher.log | grep HYDRA_LAUNCH_END"},
 								},
 							},
-							PeriodSeconds:    1,
-							FailureThreshold: 15,
+							InitialDelaySeconds: 1,
+							PeriodSeconds:       1,
+							FailureThreshold:    1,
 						},
 					}},
-					RestartPolicy: "Never",
+					RestartPolicy: "OnFailure",
 				},
 			},
 		},

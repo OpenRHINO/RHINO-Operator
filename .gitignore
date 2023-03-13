@@ -15,3 +15,6 @@
 # vendor/
 
 bin/*
+
+# Editor and IDE paraphernalia
+__debug_bin
