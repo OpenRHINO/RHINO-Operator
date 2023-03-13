@@ -181,7 +181,7 @@ func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJ
 	for i := 1; i < int(*rj.Spec.Parallelism); i++ {
 		hostsIDs = fmt.Sprintf("%s,%d", hostsIDs, i)
 	}
-	hostsIDs = hostsIDs + "'" // 需要加上单引号，否则 mpirun 会报错，hostsIDs = "'0,1,2,3'" for --np=10
+	hostsIDs = hostsIDs + "'" // 需要加上单引号，否则 mpirun 会报错，hostsIDs = "'0,1,2,3'" for --np=4
 	cmdArgs := append([]string{"mpirun", "-launcher", "manual", "-verbose", "-disable-hostname-propagation", "-hosts", hostsIDs,
 		rj.Spec.AppExec}, rj.Spec.AppArgs...)
 	cmdArgs = append(cmdArgs, "|", "tee", "/tmp/rhino-launcher.log")
