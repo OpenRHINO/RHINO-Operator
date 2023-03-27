@@ -84,7 +84,7 @@ var _ = Describe("RhinoJob controller", func() {
 						Namespace: namespace.Name,
 					},
 					Spec: rhinooprapiv1alpha1.RhinoJobSpec{
-						Image:       "zhuhe0321/integration",
+						Image:       "openrhino/integration",
 						TTL:         &rhinojobTTL,
 						Parallelism: &rhinojobParallelism,
 						AppExec:     "./integration",
