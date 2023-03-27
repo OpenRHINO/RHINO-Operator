@@ -48,8 +48,6 @@ var _ = Describe("RhinoJob controller", func() {
 		}
 
 		namespacedName := types.NamespacedName{Name: RhinoJobName, Namespace: RhinoJobName}
-		namespacedNameLauncher := types.NamespacedName{Name: RhinoJobName + "-launcher", Namespace: RhinoJobName}
-		namespacedNameWorkers := types.NamespacedName{Name: RhinoJobName + "-workers", Namespace: RhinoJobName}
 
 		BeforeEach(func() {
 			By("Creating the Namespace to perform the tests")
@@ -86,7 +84,7 @@ var _ = Describe("RhinoJob controller", func() {
 						Namespace: namespace.Name,
 					},
 					Spec: rhinooprapiv1alpha1.RhinoJobSpec{
-						Image:       "zhuhe0321/integration",
+						Image:       "openrhino/integration",
 						TTL:         &rhinojobTTL,
 						Parallelism: &rhinojobParallelism,
 						AppExec:     "./integration",
@@ -98,18 +96,26 @@ var _ = Describe("RhinoJob controller", func() {
 				Expect(err).To(Not(HaveOccurred()))
 			}
 
+			createdRhinojob := &rhinooprapiv1alpha1.RhinoJob{}
 			By("Checking if the custom resource was successfully created")
 			Eventually(func() error {
-				found := &rhinooprapiv1alpha1.RhinoJob{}
-				return k8sClient.Get(ctx, namespacedName, found)
+				return k8sClient.Get(ctx, namespacedName, createdRhinojob)
 			}, time.Minute, time.Second).Should(Succeed())
 
+			namespacedNameLauncher := types.NamespacedName{
+				Name:      nameForLauncherJob(createdRhinojob),
+				Namespace: RhinoJobName,
+			}
 			By("Checking if the launcher job was successfully created in the reconciliation")
 			Eventually(func() error {
 				found := &kbatchv1.Job{}
 				return k8sClient.Get(ctx, namespacedNameLauncher, found)
 			}, time.Minute, time.Second).Should(Succeed())
 
+			namespacedNameWorkers := types.NamespacedName{
+				Name:      nameForWorkersJob(createdRhinojob),
+				Namespace: RhinoJobName,
+			}
 			By("Checking if the workers job was successfully created in the reconciliation")
 			Eventually(func() error {
 				found := &kbatchv1.Job{}
