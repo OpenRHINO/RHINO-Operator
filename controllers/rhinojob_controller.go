@@ -191,7 +191,7 @@ func checkPodWithImageError(pod *kcorev1.PodList) string {
 		}
 	}
 	return "ContainerCreating"
-}
+} 
 
 // Launcher Job 的名称
 func nameForLauncherJob(rj *rhinooprapiv1alpha1.RhinoJob) string {
