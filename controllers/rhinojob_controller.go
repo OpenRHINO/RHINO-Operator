@@ -42,6 +42,15 @@ type RhinoJobReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+type LauncherPodStatus int
+
+const (
+	Terminated LauncherPodStatus = iota
+	ContainerCreating
+	ImageError
+	Running
+)
+
 //+kubebuilder:rbac:groups=openrhino.org,resources=rhinojobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=openrhino.org,resources=rhinojobs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=openrhino.org,resources=rhinojobs/finalizers,verbs=update
@@ -74,7 +83,7 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	var foundLauncherJob kbatchv1.Job
 	var foundWorkersJob kbatchv1.Job
-	var imagePullState string
+	var imagePullState LauncherPodStatus
 	// 获取该 RhinoJob 对应的 MPI launcher Job 和 workers job，若都不存在，则创建它们
 	// 若只有一个不存在，另一个正常运行，则不做任何处理，因为这种情况只有三种可能：
 	// 1. 刚要创建某个job，还查不到
@@ -111,7 +120,7 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			logger.Error(err, "Unable to find pod list")
 			return ctrl.Result{}, err
 		}
-		imagePullState = checkPodWithImageError(&foundPodList)
+		imagePullState = checkLauncherPodWithImageError(&foundPodList)
 		if len(foundPodList.Items) != 0 && foundPodList.Items[0].Status.Phase == "Running" {
 			podStatus := foundPodList.Items[0].Status.Conditions[1].Status
 			if podStatus == "True" {
@@ -136,7 +145,7 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// 更新 status
 	if errGetLauncherJob != nil || errGetWorkersJob != nil {
-		if imagePullState == "ImageError" {
+		if imagePullState == ImageError {
 			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.ImageError
 		} else {
 			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.Pending
@@ -156,8 +165,8 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// 如果 Launcher Job 正在拉取镜像，等待 3 秒后 Requeue
-	if imagePullState == "ContainerCreating" {
-		logger.Info("Waiting for Launcher job", "State", imagePullState)
+	if imagePullState == ContainerCreating {
+		logger.Info("Waiting for Launcher job", "State", "ContainerCreating")
 		return ctrl.Result{RequeueAfter: time.Second * 3}, nil
 	}
 
@@ -175,23 +184,28 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 // 检查 Launcher Pod 是否存在 ImagePullBackOff 或者 ErrImagePull 的错误
-func checkPodWithImageError(pod *kcorev1.PodList) string {
-	if len(pod.Items) != 0 {
-		for _, containerStatus := range pod.Items[0].Status.ContainerStatuses {
-			if containerStatus.State.Waiting != nil {
+func checkLauncherPodWithImageError(PodList *kcorev1.PodList) LauncherPodStatus {
+	if len(PodList.Items) != 0 {
+		for _, containerStatus := range PodList.Items[0].Status.ContainerStatuses {
+			switch {
+			case containerStatus.State.Waiting != nil:
+				// Launcher Pod 处于 Waiting 状态，检查是否是因为镜像拉取失败
 				if containerStatus.State.Waiting.Reason == "ContainerCreating" {
-					return "ContainerCreating"
+					return ContainerCreating
 				} else {
-					return "ImageError"
+					return ImageError
 				}
-			}
-			if containerStatus.State.Running != nil {
-				return "Running"
+			case containerStatus.State.Running != nil:
+				// Launcher Pod 创建成功，正在运行
+				return Running
+			case containerStatus.State.Terminated != nil:
+				// Launcher Pod 已经完成
+				return Terminated
 			}
 		}
 	}
-	return "ContainerCreating"
-} 
+	return ContainerCreating
+}
 
 // Launcher Job 的名称
 func nameForLauncherJob(rj *rhinooprapiv1alpha1.RhinoJob) string {
