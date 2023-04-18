@@ -9,8 +9,8 @@ metadata:
     app.kubernetes.io/created-by: rhino-operator
   name: rhinojob-integration
 spec:
-  image: "zhuhe0321/integration"
+  image: "zhuhe0321/integration1"
   ttl: 300
-  parallelism: 2
-  appExec: "./integration"
+  parallelism: 4
+  appExec: "./mpi-func"
   appArgs: ["1", "10", "1"]

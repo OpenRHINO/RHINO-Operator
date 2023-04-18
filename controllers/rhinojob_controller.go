@@ -27,7 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	kbatchv1 "k8s.io/api/batch/v1"
 	kcorev1 "k8s.io/api/core/v1"
@@ -165,10 +167,10 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// 如果 Launcher Job 正在拉取镜像，等待 3 秒后 Requeue
-	if imagePullState == ContainerCreating {
-		logger.Info("Waiting for Launcher job", "State", "ContainerCreating")
-		return ctrl.Result{RequeueAfter: time.Second * 3}, nil
-	}
+	// if imagePullState == ContainerCreating {
+	// 	logger.Info("Waiting for Launcher job", "State", "ContainerCreating")
+	// 	return ctrl.Result{RequeueAfter: time.Second * 3}, nil
+	// }
 
 	// 处理 TTL
 	if *rhinojob.Spec.TTL > 0 {
@@ -336,5 +338,12 @@ func (r *RhinoJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&rhinooprapiv1alpha1.RhinoJob{}).
 		Owns(&kbatchv1.Job{}).
+		Watches(
+			&source.Kind{Type: &kcorev1.Pod{}},
+			&handler.EnqueueRequestForOwner{
+				IsController: true,
+				OwnerType:    &rhinooprapiv1alpha1.RhinoJob{},
+			},
+		).
 		Complete(r)
 }
