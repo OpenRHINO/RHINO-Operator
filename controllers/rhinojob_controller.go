@@ -212,20 +212,22 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 func checkLauncherPodWithImageError(PodList *kcorev1.PodList) LauncherPodStatus {
 	if len(PodList.Items) != 0 {
 		for _, containerStatus := range PodList.Items[0].Status.ContainerStatuses {
-			switch {
-			case containerStatus.State.Waiting != nil:
-				// Launcher Pod 处于 Waiting 状态，检查是否是因为镜像拉取失败
-				if containerStatus.State.Waiting.Reason == "ContainerCreating" {
-					return ContainerCreating
-				} else {
-					return ImageError
+			if containerStatus.Name == "rhino-mpi-launcher" {
+				switch {
+				case containerStatus.State.Waiting != nil:
+					// Launcher Pod 处于 Waiting 状态，检查是否是因为镜像拉取失败
+					if containerStatus.State.Waiting.Reason == "ContainerCreating" {
+						return ContainerCreating
+					} else {
+						return ImageError
+					}
+				case containerStatus.State.Running != nil:
+					// Launcher Pod 创建成功，正在运行
+					return Running
+				case containerStatus.State.Terminated != nil:
+					// Launcher Pod 已经完成
+					return Terminated
 				}
-			case containerStatus.State.Running != nil:
-				// Launcher Pod 创建成功，正在运行
-				return Running
-			case containerStatus.State.Terminated != nil:
-				// Launcher Pod 已经完成
-				return Terminated
 			}
 		}
 	}
