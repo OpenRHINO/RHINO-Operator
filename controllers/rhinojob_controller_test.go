@@ -69,6 +69,38 @@ var _ = Describe("RhinoJob controller", func() {
 			_ = os.Unsetenv("RHINOJOB_IMAGE")
 		})
 
+		It("should detect image pull error for the custom resource RhinoJob", func() {
+			By("Creating the custom resource for the Kind RhinoJob with non-existent image")
+			nonExistentImage := "openrhino/nonexistentimage"
+			rhinojob := &rhinooprapiv1alpha1.RhinoJob{}
+			err := k8sClient.Get(ctx, namespacedName, rhinojob)
+			if err != nil && errors.IsNotFound(err) {
+				rhinojob := &rhinooprapiv1alpha1.RhinoJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      RhinoJobName,
+						Namespace: namespace.Name,
+					},
+					Spec: rhinooprapiv1alpha1.RhinoJobSpec{
+						Image:       nonExistentImage,
+					},
+				}	
+				err = k8sClient.Create(ctx, rhinojob)
+				Expect(err).To(Not(HaveOccurred()))
+			}
+				
+			By("Checking if rhinojob has detected the image pull error")
+			Eventually(func() error {
+				err := k8sClient.Get(ctx, namespacedName, rhinojob)
+				if err != nil {
+					return err
+				}		
+				if rhinojob.Status.JobStatus == rhinooprapiv1alpha1.ImageError {
+					return nil
+				}
+				return fmt.Errorf("Rhinojob has not detected the image pull error")
+			}, time.Minute, time.Second).Should(Succeed())
+		})
+
 		It("should successfully reconcile a custom resource for RhinoJob", func() {
 			By("Creating the custom resource for the Kind RhinoJob")
 			rhinojob := &rhinooprapiv1alpha1.RhinoJob{}
@@ -87,7 +119,7 @@ var _ = Describe("RhinoJob controller", func() {
 						Image:       "openrhino/integration",
 						TTL:         &rhinojobTTL,
 						Parallelism: &rhinojobParallelism,
-						AppExec:     "./integration",
+						AppExec:     "/mpi-func",
 						AppArgs:     []string{"1", "10", "1"},
 					},
 				}
