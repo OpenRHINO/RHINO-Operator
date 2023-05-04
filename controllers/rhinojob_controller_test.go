@@ -69,38 +69,6 @@ var _ = Describe("RhinoJob controller", func() {
 			_ = os.Unsetenv("RHINOJOB_IMAGE")
 		})
 
-		It("should detect image pull error for the custom resource RhinoJob", func() {
-			By("Creating the custom resource for the Kind RhinoJob with non-existent image")
-			nonExistentImage := "openrhino/nonexistentimage"
-			rhinojob := &rhinooprapiv1alpha1.RhinoJob{}
-			err := k8sClient.Get(ctx, namespacedName, rhinojob)
-			if err != nil && errors.IsNotFound(err) {
-				rhinojob := &rhinooprapiv1alpha1.RhinoJob{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      RhinoJobName,
-						Namespace: namespace.Name,
-					},
-					Spec: rhinooprapiv1alpha1.RhinoJobSpec{
-						Image:       nonExistentImage,
-					},
-				}	
-				err = k8sClient.Create(ctx, rhinojob)
-				Expect(err).To(Not(HaveOccurred()))
-			}
-				
-			By("Checking if rhinojob has detected the image pull error")
-			Eventually(func() error {
-				err := k8sClient.Get(ctx, namespacedName, rhinojob)
-				if err != nil {
-					return err
-				}		
-				if rhinojob.Status.JobStatus == rhinooprapiv1alpha1.ImageError {
-					return nil
-				}
-				return fmt.Errorf("Rhinojob has not detected the image pull error")
-			}, time.Minute, time.Second).Should(Succeed())
-		})
-
 		It("should successfully reconcile a custom resource for RhinoJob", func() {
 			By("Creating the custom resource for the Kind RhinoJob")
 			rhinojob := &rhinooprapiv1alpha1.RhinoJob{}
@@ -189,6 +157,74 @@ var _ = Describe("RhinoJob controller", func() {
 					return nil
 				}
 				return fmt.Errorf("Rhinojob not completed")
+			}, time.Minute, time.Second).Should(Succeed())
+		})
+	})
+
+	Context("RhinoJob image pull test", func() {
+
+		const RhinoJobName = "image-pull-test-rhinojob"
+
+		ctx := context.Background()
+
+		namespace := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      RhinoJobName,
+				Namespace: RhinoJobName,
+			},
+		}
+
+		namespacedName := types.NamespacedName{Name: RhinoJobName, Namespace: RhinoJobName}
+
+		BeforeEach(func() {
+			By("Creating the Namespace to perform the tests")
+			err := k8sClient.Create(ctx, namespace)
+			Expect(err).To(Not(HaveOccurred()))
+
+			By("Setting the Image ENV VAR which stores the Operand image")
+			err = os.Setenv("RHINOJOB_IMAGE", "openrhino/image:test")
+			Expect(err).To(Not(HaveOccurred()))
+		})
+
+		AfterEach(func() {
+			// TODO(user): Attention if you improve this code by adding other context test you MUST
+			// be aware of the current delete namespace limitations. More info: https://book.kubebuilder.io/reference/envtest.html#testing-considerations
+			By("Deleting the Namespace to perform the tests")
+			_ = k8sClient.Delete(ctx, namespace)
+
+			By("Removing the Image ENV VAR which stores the Operand image")
+			_ = os.Unsetenv("RHINOJOB_IMAGE")
+		})
+
+		It("should detect image pull error for the container in RhinoJob", func() {
+			By("Creating the custom resource for the Kind RhinoJob with non-existent image")
+			nonExistentImage := "openrhino/nonexistentimage"
+			rhinojob := &rhinooprapiv1alpha1.RhinoJob{}
+			err := k8sClient.Get(ctx, namespacedName, rhinojob)
+			if err != nil && errors.IsNotFound(err) {
+				rhinojob := &rhinooprapiv1alpha1.RhinoJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      RhinoJobName,
+						Namespace: namespace.Name,
+					},
+					Spec: rhinooprapiv1alpha1.RhinoJobSpec{
+						Image:       nonExistentImage,
+					},
+				}	
+				err = k8sClient.Create(ctx, rhinojob)
+				Expect(err).To(Not(HaveOccurred()))
+			}
+				
+			By("Checking if rhinojob has detected the image pull error")
+			Eventually(func() error {
+				err := k8sClient.Get(ctx, namespacedName, rhinojob)
+				if err != nil {
+					return err
+				}		
+				if rhinojob.Status.JobStatus == rhinooprapiv1alpha1.ImageError {
+					return nil
+				}
+				return fmt.Errorf("Rhinojob has not detected the image pull error")
 			}, time.Minute, time.Second).Should(Succeed())
 		})
 	})
