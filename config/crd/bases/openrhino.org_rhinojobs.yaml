@@ -87,7 +87,17 @@ spec:
     storage: false
     subresources:
       status: {}
-  - name: v1alpha2
+  - additionalPrinterColumns:
+    - jsonPath: .spec.parallelism
+      name: Parallelism
+      type: integer
+    - jsonPath: .status.jobStatus
+      name: Status
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha2
     schema:
       openAPIV3Schema:
         description: RhinoJob is the Schema for the rhinojobs API
@@ -107,16 +117,53 @@ spec:
           spec:
             description: RhinoJobSpec defines the desired state of RhinoJob
             properties:
-              foo:
-                description: Foo is an example field of RhinoJob. Edit rhinojob_types.go
-                  to remove/update
+              appArgs:
+                items:
+                  type: string
+                type: array
+              appExec:
                 type: string
+              dataPath:
+                type: string
+              dataServer:
+                type: string
+              image:
+                type: string
+              memoryAllocationMode:
+                default: FixedPerCoreMemory
+                type: string
+              memoryAllocationSize:
+                default: 1
+                format: int32
+                minimum: 1
+                type: integer
+              parallelism:
+                default: 1
+                format: int32
+                minimum: 1
+                type: integer
+              ttl:
+                default: 600
+                format: int32
+                minimum: 0
+                type: integer
+            required:
+            - appExec
+            - image
             type: object
           status:
             description: RhinoJobStatus defines the observed state of RhinoJob
+            properties:
+              jobStatus:
+                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
+                  of cluster Important: Run "make" to regenerate code after modifying
+                  this file'
+                type: string
+            required:
+            - jobStatus
             type: object
         type: object
     served: true
-    storage: false
+    storage: true
     subresources:
       status: {}
