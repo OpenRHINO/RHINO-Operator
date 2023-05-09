@@ -46,7 +46,7 @@ type RhinoJobSpec struct {
 	MemoryAllocationMode MemoryAllocationMode `json:"memoryAllocationMode,omitempty"`
 	// +optional
 	// +kubebuilder:validation:Minimum:=1
-	// +kubebuilder:default:=1
+	// +kubebuilder:default:=2
 	MemoryAllocationSize *int32 `json:"memoryAllocationSize,omitempty"`
 }
 

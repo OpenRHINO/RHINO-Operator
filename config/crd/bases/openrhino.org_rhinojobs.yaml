@@ -133,7 +133,7 @@ spec:
                 default: FixedPerCoreMemory
                 type: string
               memoryAllocationSize:
-                default: 1
+                default: 2
                 format: int32
                 minimum: 1
                 type: integer

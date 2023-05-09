@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1alpha2 contains API Schema definitions for the  v1alpha2 API group
-//+kubebuilder:object:generate=true
-//+groupName=openrhino.org
+// Package v1alpha2 contains API Schema definitions for the v1alpha2 API group
+// +kubebuilder:object:generate=true
+// +groupName=openrhino.org
 package v1alpha2
 
 import (
