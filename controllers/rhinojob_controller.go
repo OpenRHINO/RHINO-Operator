@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -337,6 +338,7 @@ func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha2.RhinoJo
 		},
 	}
 
+	// The data volume for workers
 	if rj.Spec.DataPath != "" && rj.Spec.DataServer != "" {
 		job.Spec.Template.Spec.Volumes = []kcorev1.Volume{{
 			Name: "data",
@@ -353,9 +355,39 @@ func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha2.RhinoJo
 		}}
 	}
 
+	AddECILabelAndAnnotationsToPods(rj, &job.Spec.Template)
+
 	err := ctrl.SetControllerReference(rj, job, r.Scheme)
 
 	return job, err
+}
+
+// If the workers are running in a environment that supports ECI,
+// the pods with ECI label and annotations will be created using ECIs.
+// Otherwise, the pods will be created using normal containers.
+func AddECILabelAndAnnotationsToPods(rj *rhinooprapiv1alpha2.RhinoJob, podTemplate *kcorev1.PodTemplateSpec) error {
+	podTemplate.ObjectMeta.Labels = map[string]string{
+		"alibabacloud.com/eci": "true", //For now, only Aliyun is supported.
+		//In the future, we will support other cloud providers.
+		//And let users choose the cloud provider.
+	}
+
+	var memPerPod float64
+	if rj.Spec.MemoryAllocationMode == rhinooprapiv1alpha2.FixedTotalMemory {
+		memPerPod = float64(*rj.Spec.MemoryAllocationSize) / float64(*rj.Spec.Parallelism)
+		podTemplate.ObjectMeta.Annotations = map[string]string{
+			"k8s.aliyun.com/eci-instance-cpu": "1",
+			"k8s.aliyun.com/eci-instance-mem": strconv.FormatFloat(memPerPod, 'f', 2, 64),
+		}
+	} else { // FixedPerCoreMemory
+		memPerPod = float64(*rj.Spec.MemoryAllocationSize)
+		podTemplate.ObjectMeta.Annotations = map[string]string{
+			"k8s.aliyun.com/eci-instance-cpu": "1",
+			"k8s.aliyun.com/eci-instance-mem": strconv.FormatFloat(memPerPod, 'f', 2, 64),
+		}
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
