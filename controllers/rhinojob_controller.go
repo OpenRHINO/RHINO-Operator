@@ -35,7 +35,7 @@ import (
 	kcorev1 "k8s.io/api/core/v1"
 	kmetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	rhinooprapiv1alpha1 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha1" //这里导入后的名字跟脚手架代码自动生成的不一样，这样改的原因是为了可读性更好
+	rhinooprapiv1alpha2 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha2" //这里导入后的名字跟脚手架代码自动生成的不一样，这样改的原因是为了可读性更好
 )
 
 // RhinoJobReconciler reconciles a RhinoJob object
@@ -73,7 +73,7 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	logger.Info("In the reconcile function of RhinoJob.")
 
-	var rhinojob rhinooprapiv1alpha1.RhinoJob
+	var rhinojob rhinooprapiv1alpha2.RhinoJob
 	if err := r.Get(ctx, req.NamespacedName, &rhinojob); err != nil {
 		if errors.IsNotFound(err) {
 			var job kbatchv1.Job
@@ -177,17 +177,17 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// 更新 status
 	if errGetLauncherJob != nil || errGetWorkersJob != nil {
 		if imagePullState == ImageError {
-			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.ImageError
+			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.ImageError
 		} else {
-			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.Pending
+			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.Pending
 		}
 	} else {
 		if foundWorkersJob.Status.Failed+foundLauncherJob.Status.Failed > 0 {
-			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.Failed
+			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.Failed
 		} else if foundWorkersJob.Status.Succeeded == *rhinojob.Spec.Parallelism && foundLauncherJob.Status.Succeeded == 1 {
-			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.Completed
+			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.Completed
 		} else {
-			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.Running
+			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.Running
 		}
 	}
 	if err := r.Status().Update(ctx, &rhinojob); err != nil {
@@ -235,21 +235,21 @@ func checkLauncherPodWithImageError(PodList *kcorev1.PodList) LauncherPodStatus 
 }
 
 // Launcher Job 的名称
-func nameForLauncherJob(rj *rhinooprapiv1alpha1.RhinoJob) string {
+func nameForLauncherJob(rj *rhinooprapiv1alpha2.RhinoJob) string {
 	return rj.Name + "-" + string(rj.UID)[:5] + "-launcher"
 }
 
 // Launcher Pod 的 Labels，也是后续寻址 Launcher Pod 的 Selector
-func labelsForLauncherPod(rj *rhinooprapiv1alpha1.RhinoJob) map[string]string {
+func labelsForLauncherPod(rj *rhinooprapiv1alpha2.RhinoJob) map[string]string {
 	return map[string]string{"app": rj.Name, "type": "launcher", "rhinoID": string(rj.UID)}
 }
 
-func nameForWorkersJob(rj *rhinooprapiv1alpha1.RhinoJob) string {
+func nameForWorkersJob(rj *rhinooprapiv1alpha2.RhinoJob) string {
 	return rj.Name + "-" + string(rj.UID)[:5] + "-workers"
 }
 
 // 构造Launcher Job
-func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJob) (*kbatchv1.Job, error) {
+func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha2.RhinoJob) (*kbatchv1.Job, error) {
 	name := nameForLauncherJob(rj)
 	launcherPodLabels := labelsForLauncherPod(rj)
 
@@ -303,7 +303,7 @@ func (r *RhinoJobReconciler) constructLauncherJob(rj *rhinooprapiv1alpha1.RhinoJ
 }
 
 // 构造 Workers Job
-func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha1.RhinoJob, ctx context.Context) (*kbatchv1.Job, error) {
+func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha2.RhinoJob, ctx context.Context) (*kbatchv1.Job, error) {
 	name := nameForWorkersJob(rj)
 	launcherPodLabels := labelsForLauncherPod(rj)
 
@@ -361,7 +361,7 @@ func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha1.RhinoJo
 // SetupWithManager sets up the controller with the Manager.
 func (r *RhinoJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&rhinooprapiv1alpha1.RhinoJob{}).
+		For(&rhinooprapiv1alpha2.RhinoJob{}).
 		Owns(&kbatchv1.Job{}).
 		Watches(
 			&source.Kind{Type: &kcorev1.Pod{}},
