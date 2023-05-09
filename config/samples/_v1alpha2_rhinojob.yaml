@@ -1,6 +1,10 @@
 apiVersion: openrhino.org/v1alpha2
 kind: RhinoJob
 metadata:
-  name: rhinojob-sample
+  name: rhinojob-sample-v1alpha2
 spec:
-  # TODO(user): Add fields here
+  image: "openrhino/integration"
+  ttl: 300
+  parallelism: 2
+  appExec: "./integration"
+  appArgs: ["1", "10", "1"]

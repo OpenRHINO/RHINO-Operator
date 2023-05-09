@@ -48,15 +48,15 @@ type RhinoJobSpec struct {
 	// +kubebuilder:validation:Minimum:=1
 	// +kubebuilder:default:=1
 	MemoryAllocationSize *int32 `json:"memoryAllocationSize,omitempty"`
-
 }
 
 type MemoryAllocationMode string
+
 const (
 	FixedTotalMemory   MemoryAllocationMode = "FixedTotalMemory"
 	FixedPerCoreMemory MemoryAllocationMode = "FixedPerCoreMemory"
 )
-    
+
 // RhinoJobStatus defines the observed state of RhinoJob
 type RhinoJobStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
@@ -65,6 +65,7 @@ type RhinoJobStatus struct {
 }
 
 type JobStatus string
+
 const (
 	Pending    JobStatus = "Pending"
 	Running    JobStatus = "Running"
