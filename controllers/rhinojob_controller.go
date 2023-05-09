@@ -27,7 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	kbatchv1 "k8s.io/api/batch/v1"
 	kcorev1 "k8s.io/api/core/v1"
@@ -41,6 +43,15 @@ type RhinoJobReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
+
+type LauncherPodStatus int
+
+const (
+	Terminated LauncherPodStatus = iota
+	ContainerCreating
+	ImageError
+	Running
+)
 
 //+kubebuilder:rbac:groups=openrhino.org,resources=rhinojobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=openrhino.org,resources=rhinojobs/status,verbs=get;update;patch
@@ -65,16 +76,45 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	var rhinojob rhinooprapiv1alpha1.RhinoJob
 	if err := r.Get(ctx, req.NamespacedName, &rhinojob); err != nil {
 		if errors.IsNotFound(err) {
-			logger.Info("Resource not found. Ignoring since object must be deleted")
-			return ctrl.Result{}, nil
+			var job kbatchv1.Job
+			err = r.Get(ctx, req.NamespacedName, &job)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					logger.Info("Neither RhinoJob nor Job found. Ignoring since object must be deleted")
+					return ctrl.Result{}, nil
+				}
+				logger.Error(err, "Failed to get Job")
+				return ctrl.Result{}, client.IgnoreNotFound(err)
+			}
+
+			var isRhinoJob bool
+			// Find the associated RhinoJob for the Job
+			for _, ownerRef := range job.OwnerReferences {
+				if ownerRef.Kind == "RhinoJob" {
+					// Get the RhinoJob using the ownerRef
+					err = r.Get(ctx, types.NamespacedName{Namespace: job.Namespace, Name: ownerRef.Name}, &rhinojob)
+					if err != nil {
+						logger.Error(err, "Failed to get RhinoJob for the Job")
+						return ctrl.Result{}, client.IgnoreNotFound(err)
+					}
+					isRhinoJob = true
+					break
+				}
+			}
+			if !isRhinoJob {
+				// If no RhinoJob found, ignore the Job
+				logger.Info("Job is not related to a RhinoJob. Ignoring.")
+				return ctrl.Result{}, nil
+			}
+		} else if err != nil {
+			logger.Error(err, "Failed to get RhinoJob")
+			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
-		logger.Error(err, "Failed to get RhinoJob")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	var foundLauncherJob kbatchv1.Job
 	var foundWorkersJob kbatchv1.Job
-
+	var imagePullState LauncherPodStatus
 	// 获取该 RhinoJob 对应的 MPI launcher Job 和 workers job，若都不存在，则创建它们
 	// 若只有一个不存在，另一个正常运行，则不做任何处理，因为这种情况只有三种可能：
 	// 1. 刚要创建某个job，还查不到
@@ -108,9 +148,10 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		launcherPodLabels := labelsForLauncherPod(&rhinojob)
 		var foundPodList kcorev1.PodList
 		if err := r.List(ctx, &foundPodList, client.MatchingLabels(launcherPodLabels)); err != nil {
-			logger.Error(err, "Unable find pod list")
+			logger.Error(err, "Unable to find pod list")
 			return ctrl.Result{}, err
 		}
+		imagePullState = checkLauncherPodWithImageError(&foundPodList)
 		if len(foundPodList.Items) != 0 && foundPodList.Items[0].Status.Phase == "Running" {
 			podStatus := foundPodList.Items[0].Status.Conditions[1].Status
 			if podStatus == "True" {
@@ -135,7 +176,11 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// 更新 status
 	if errGetLauncherJob != nil || errGetWorkersJob != nil {
-		rhinojob.Status.JobStatus = rhinooprapiv1alpha1.Pending
+		if imagePullState == ImageError {
+			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.ImageError
+		} else {
+			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.Pending
+		}
 	} else {
 		if foundWorkersJob.Status.Failed+foundLauncherJob.Status.Failed > 0 {
 			rhinojob.Status.JobStatus = rhinooprapiv1alpha1.Failed
@@ -161,6 +206,32 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// 检查 Launcher Pod 是否存在 ImagePullBackOff 或者 ErrImagePull 的错误
+func checkLauncherPodWithImageError(PodList *kcorev1.PodList) LauncherPodStatus {
+	if len(PodList.Items) != 0 {
+		for _, containerStatus := range PodList.Items[0].Status.ContainerStatuses {
+			if containerStatus.Name == "rhino-mpi-launcher" {
+				switch {
+				case containerStatus.State.Waiting != nil:
+					// Launcher Pod 处于 Waiting 状态，检查是否是因为镜像拉取失败
+					if containerStatus.State.Waiting.Reason == "ContainerCreating" {
+						return ContainerCreating
+					} else {
+						return ImageError
+					}
+				case containerStatus.State.Running != nil:
+					// Launcher Pod 创建成功，正在运行
+					return Running
+				case containerStatus.State.Terminated != nil:
+					// Launcher Pod 已经完成
+					return Terminated
+				}
+			}
+		}
+	}
+	return ContainerCreating
 }
 
 // Launcher Job 的名称
@@ -292,5 +363,12 @@ func (r *RhinoJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&rhinooprapiv1alpha1.RhinoJob{}).
 		Owns(&kbatchv1.Job{}).
+		Watches(
+			&source.Kind{Type: &kcorev1.Pod{}},
+			&handler.EnqueueRequestForOwner{
+				IsController: true,
+				OwnerType:    &kbatchv1.Job{},
+			},
+		).
 		Complete(r)
 }
