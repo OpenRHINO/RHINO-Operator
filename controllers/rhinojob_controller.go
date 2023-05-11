@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -373,18 +374,15 @@ func AddECILabelAndAnnotationsToPods(rj *rhinooprapiv1alpha2.RhinoJob, podTempla
 	}
 
 	var memPerPod float64
+	var eciUseSpecs string
 	if rj.Spec.MemoryAllocationMode == rhinooprapiv1alpha2.FixedTotalMemory {
-		memPerPod = float64(*rj.Spec.MemoryAllocationSize) / float64(*rj.Spec.Parallelism)
-		podTemplate.ObjectMeta.Annotations = map[string]string{
-			"k8s.aliyun.com/eci-instance-cpu": "1",
-			"k8s.aliyun.com/eci-instance-mem": strconv.FormatFloat(memPerPod, 'f', 2, 64),
-		}
+		memPerPod = math.Ceil(float64(*rj.Spec.MemoryAllocationSize) / float64(*rj.Spec.Parallelism))
+		eciUseSpecs = "1-" + strconv.FormatFloat(memPerPod, 'f', 1, 64) + "Gi"
 	} else { // FixedPerCoreMemory
-		memPerPod = float64(*rj.Spec.MemoryAllocationSize)
-		podTemplate.ObjectMeta.Annotations = map[string]string{
-			"k8s.aliyun.com/eci-instance-cpu": "1",
-			"k8s.aliyun.com/eci-instance-mem": strconv.FormatFloat(memPerPod, 'f', 2, 64),
-		}
+		eciUseSpecs = "1-" + strconv.Itoa(int(*rj.Spec.MemoryAllocationSize)) + "Gi"
+	}
+	podTemplate.ObjectMeta.Annotations = map[string]string{
+		"k8s.aliyun.com/eci-use-specs": eciUseSpecs,
 	}
 
 	return nil
