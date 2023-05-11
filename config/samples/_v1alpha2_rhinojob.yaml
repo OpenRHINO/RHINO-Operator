@@ -6,5 +6,5 @@ spec:
   image: "openrhino/integration"
   ttl: 300
   parallelism: 2
-  appExec: "./integration"
+  appExec: "/app/mpi-func"
   appArgs: ["1", "10", "1"]
