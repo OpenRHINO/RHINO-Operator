@@ -63,7 +63,9 @@ var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
-		UseExistingCluster:    &useLocalCluster,
+		UseExistingCluster:    &useLocalCluster, // Our tests need to check the status of Jobs and Pods.
+		// So we need to use a full-fledged Kubernetes environment,
+		// but not only the API server and etcd.
 	}
 
 	var err error
@@ -101,9 +103,6 @@ var _ = BeforeSuite(func() {
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred())
 	}()
-
-	k8sClient = k8sManager.GetClient()
-	Expect(err).ToNot(HaveOccurred())
 })
 
 var _ = AfterSuite(func() {
