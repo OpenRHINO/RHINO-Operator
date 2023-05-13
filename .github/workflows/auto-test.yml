@@ -1,0 +1,42 @@
+name: Operator Automated Testing
+
+on:
+  push:
+
+  pull_request:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+
+jobs:
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19
+
+    - name: Install Minikube
+      run: |
+        curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        sudo install minikube-linux-amd64 /usr/local/bin/minikube
+
+    - name: Start Minikube
+      run: |
+        sudo minikube start --kubernetes-version=v1.24.10 --force
+
+    - name: Wait for Minikube
+      timeout-minutes: 5
+      run: |
+        while [ "$(sudo minikube status --format '{{.Host}}')" != "Running" ]; do
+          echo "Waiting for Minikube to start..."
+          sleep 5
+        done
+
+    - name: Test
+      run: |
+        sudo --preserve-env=GOROOT,GOPATH bash -c "go test -v ./..."
