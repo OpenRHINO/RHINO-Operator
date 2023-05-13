@@ -45,7 +45,7 @@ jobs:
     - name: Build
       run: |
         sudo make install
-        sudo make run
+        sudo make run &
 
     - name: Configure Docker to use Minikube's Docker daemon
       run: |
