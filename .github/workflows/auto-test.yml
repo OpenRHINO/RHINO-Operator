@@ -54,4 +54,4 @@ jobs:
 
     - name: Test
       run: |
-        sudo --preserve-env=GOROOT,GOPATH,DOCKER_TLS_VERIFY,DOCKER_HOST,DOCKER_CERT_PATH,MINIKUBE_ACTIVE_DOCKERD bash -c "source /tmp/docker-env.sh && go test -v ./..."
+        sudo --preserve-env=GOROOT,GOPATH,DOCKER_TLS_VERIFY,DOCKER_HOST,DOCKER_CERT_PATH,MINIKUBE_ACTIVE_DOCKERD bash -c "go test -v ./..."
