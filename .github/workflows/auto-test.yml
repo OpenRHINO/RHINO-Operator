@@ -42,15 +42,15 @@ jobs:
     #     echo "Waiting for RHINO Operator to start..."
     #     sleep 30
 
-    - name: Build
-      run: |
-        sudo make install
-        sudo make run &
+    # - name: Build
+    #   run: |
+    #     sudo make install
+    #     sudo make run &
 
-    - name: Configure Docker to use Minikube's Docker daemon
-      run: |
-        sudo minikube -p minikube docker-env | sudo tee /tmp/docker-env.sh
-        sudo chmod +x /tmp/docker-env.sh
+    # - name: Configure Docker to use Minikube's Docker daemon
+    #   run: |
+    #     sudo minikube -p minikube docker-env | sudo tee /tmp/docker-env.sh
+    #     sudo chmod +x /tmp/docker-env.sh
 
     - name: Test
       run: |
