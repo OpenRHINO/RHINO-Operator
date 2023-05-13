@@ -30,6 +30,7 @@ jobs:
         sudo minikube start --kubernetes-version=v1.24.10 --force
 
     - name: Wait for Minikube
+      timeout-minutes: 5
       run: |
         while [ "$(sudo minikube status --format '{{.Host}}')" != "Running" ]; do
           echo "Waiting for Minikube to start..."
