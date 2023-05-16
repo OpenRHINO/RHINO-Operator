@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	openrhinoorgv1alpha1 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha1"
+	openrhinoorgv1alpha2 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha2"
 	"github.com/OpenRHINO/RHINO-Operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
@@ -46,6 +47,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(openrhinoorgv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(openrhinoorgv1alpha2.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

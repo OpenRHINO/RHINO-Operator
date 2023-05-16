@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	rhinooprapiv1alpha1 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha1"
+	rhinooprapiv1alpha2 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha2"
 	kbatchv1 "k8s.io/api/batch/v1"
 )
 
@@ -71,19 +71,19 @@ var _ = Describe("RhinoJob controller", func() {
 
 		It("should successfully reconcile a custom resource for RhinoJob", func() {
 			By("Creating the custom resource for the Kind RhinoJob")
-			rhinojob := &rhinooprapiv1alpha1.RhinoJob{}
+			rhinojob := &rhinooprapiv1alpha2.RhinoJob{}
 			err := k8sClient.Get(ctx, namespacedName, rhinojob)
 			if err != nil && errors.IsNotFound(err) {
 				// Let's mock our custom resource at the same way that we would
 				// apply on the cluster the manifest under config/samples
 				rhinojobTTL := int32(300)
 				rhinojobParallelism := int32(2)
-				rhinojob := &rhinooprapiv1alpha1.RhinoJob{
+				rhinojob := &rhinooprapiv1alpha2.RhinoJob{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      RhinoJobName,
 						Namespace: namespace.Name,
 					},
-					Spec: rhinooprapiv1alpha1.RhinoJobSpec{
+					Spec: rhinooprapiv1alpha2.RhinoJobSpec{
 						Image:       "openrhino/integration",
 						TTL:         &rhinojobTTL,
 						Parallelism: &rhinojobParallelism,
@@ -96,7 +96,7 @@ var _ = Describe("RhinoJob controller", func() {
 				Expect(err).To(Not(HaveOccurred()))
 			}
 
-			createdRhinojob := &rhinooprapiv1alpha1.RhinoJob{}
+			createdRhinojob := &rhinooprapiv1alpha2.RhinoJob{}
 			By("Checking if the custom resource was successfully created")
 			Eventually(func() error {
 				return k8sClient.Get(ctx, namespacedName, createdRhinojob)
@@ -153,7 +153,7 @@ var _ = Describe("RhinoJob controller", func() {
 					return err
 				}
 
-				if rhinojob.Status.JobStatus == rhinooprapiv1alpha1.Completed {
+				if rhinojob.Status.JobStatus == rhinooprapiv1alpha2.Completed {
 					return nil
 				}
 				return fmt.Errorf("Rhinojob not completed")
@@ -199,29 +199,29 @@ var _ = Describe("RhinoJob controller", func() {
 		It("should detect image pull error for the container in RhinoJob", func() {
 			By("Creating the custom resource for the Kind RhinoJob with non-existent image")
 			nonExistentImage := "openrhino/nonexistentimage"
-			rhinojob := &rhinooprapiv1alpha1.RhinoJob{}
+			rhinojob := &rhinooprapiv1alpha2.RhinoJob{}
 			err := k8sClient.Get(ctx, namespacedName, rhinojob)
 			if err != nil && errors.IsNotFound(err) {
-				rhinojob := &rhinooprapiv1alpha1.RhinoJob{
+				rhinojob := &rhinooprapiv1alpha2.RhinoJob{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      RhinoJobName,
 						Namespace: namespace.Name,
 					},
-					Spec: rhinooprapiv1alpha1.RhinoJobSpec{
-						Image:       nonExistentImage,
+					Spec: rhinooprapiv1alpha2.RhinoJobSpec{
+						Image: nonExistentImage,
 					},
-				}	
+				}
 				err = k8sClient.Create(ctx, rhinojob)
 				Expect(err).To(Not(HaveOccurred()))
 			}
-				
+
 			By("Checking if rhinojob has detected the image pull error")
 			Eventually(func() error {
 				err := k8sClient.Get(ctx, namespacedName, rhinojob)
 				if err != nil {
 					return err
-				}		
-				if rhinojob.Status.JobStatus == rhinooprapiv1alpha1.ImageError {
+				}
+				if rhinojob.Status.JobStatus == rhinooprapiv1alpha2.ImageError {
 					return nil
 				}
 				return fmt.Errorf("Rhinojob has not detected the image pull error")
