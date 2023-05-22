@@ -31,12 +31,4 @@ resources:
   kind: RhinoJob
   path: github.com/OpenRHINO/RHINO-Operator/api/v1alpha2
   version: v1alpha2
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: openrhino.org
-  kind: Webhook
-  path: github.com/OpenRHINO/RHINO-Operator/api/v1
-  version: v1
 version: "3"
