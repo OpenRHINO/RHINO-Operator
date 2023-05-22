@@ -34,7 +34,7 @@ import (
 
 	openrhinoorgv1alpha1 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha1"
 	openrhinoorgv1alpha2 "github.com/OpenRHINO/RHINO-Operator/api/v1alpha2"
-	"github.com/OpenRHINO/RHINO-Operator/controllers"
+	controllers "github.com/OpenRHINO/RHINO-Operator/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
