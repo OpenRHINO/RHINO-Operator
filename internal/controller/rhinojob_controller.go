@@ -312,7 +312,7 @@ func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha2.RhinoJo
 	var foundPodList kcorev1.PodList
 	r.List(ctx, &foundPodList, client.MatchingLabels(launcherPodLabels))
 	completionMode := "Indexed"
-	cmdArgs := []string{"-c", "/usr/local/bin/hydra_pmi_proxy --control-port " + foundPodList.Items[0].Status.PodIP +
+	cmdArgs := []string{"-c", "hydra_pmi_proxy --control-port " + foundPodList.Items[0].Status.PodIP +
 		":20000 --debug --rmk user --launcher manual --demux poll --pgid 0 --retries 10 --usize -2 --proxy-id $JOB_COMPLETION_INDEX"}
 
 	// 构造 Workers Job
