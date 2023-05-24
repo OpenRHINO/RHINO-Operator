@@ -179,17 +179,17 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// 更新 status
 	if errGetLauncherJob != nil || errGetWorkersJob != nil {
 		if imagePullState == ImageError {
-			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.ImageError
+			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.RhinoJobImageError
 		} else {
-			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.Pending
+			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.RhinoJobPending
 		}
 	} else {
 		if foundWorkersJob.Status.Failed+foundLauncherJob.Status.Failed > 0 {
-			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.Failed
+			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.RhinoJobFailed
 		} else if foundWorkersJob.Status.Succeeded == *rhinojob.Spec.Parallelism && foundLauncherJob.Status.Succeeded == 1 {
-			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.Completed
+			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.RhinoJobCompleted
 		} else {
-			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.Running
+			rhinojob.Status.JobStatus = rhinooprapiv1alpha2.RhinoJobRunning
 		}
 	}
 	if err := r.Status().Update(ctx, &rhinojob); err != nil {

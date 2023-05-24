@@ -67,11 +67,11 @@ type RhinoJobStatus struct {
 type JobStatus string
 
 const (
-	Pending    JobStatus = "Pending"
-	Running    JobStatus = "Running"
-	Failed     JobStatus = "Failed"
-	Completed  JobStatus = "Completed"
-	ImageError JobStatus = "ImageError"
+	RhinoJobPending    JobStatus = "Pending"
+	RhinoJobRunning    JobStatus = "Running"
+	RhinoJobFailed     JobStatus = "Failed"
+	RhinoJobCompleted  JobStatus = "Completed"
+	RhinoJobImageError JobStatus = "ImageError"
 )
 
 //+kubebuilder:object:root=true
