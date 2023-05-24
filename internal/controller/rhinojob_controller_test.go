@@ -153,7 +153,7 @@ var _ = Describe("RhinoJob controller", func() {
 					return err
 				}
 
-				if rhinojob.Status.JobStatus == rhinooprapiv1alpha2.Completed {
+				if rhinojob.Status.JobStatus == rhinooprapiv1alpha2.RhinoJobCompleted {
 					return nil
 				}
 				return fmt.Errorf("Rhinojob not completed")
@@ -221,7 +221,7 @@ var _ = Describe("RhinoJob controller", func() {
 				if err != nil {
 					return err
 				}
-				if rhinojob.Status.JobStatus == rhinooprapiv1alpha2.ImageError {
+				if rhinojob.Status.JobStatus == rhinooprapiv1alpha2.RhinoJobImageError {
 					return nil
 				}
 				return fmt.Errorf("Rhinojob has not detected the image pull error")
