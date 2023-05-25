@@ -43,6 +43,7 @@ type RhinoJobSpec struct {
 	DataPath   string   `json:"dataPath,omitempty"`
 	// +optional
 	// +kubebuilder:default:=FixedPerCoreMemory
+	// +kubebuilder:validation:Enum=FixedTotalMemory;FixedPerCoreMemory
 	MemoryAllocationMode MemoryAllocationMode `json:"memoryAllocationMode,omitempty"`
 	// +optional
 	// +kubebuilder:validation:Minimum:=1
