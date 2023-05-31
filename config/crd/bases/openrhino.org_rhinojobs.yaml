@@ -163,12 +163,12 @@ spec:
                   this file'
                 type: string
               launcherPods:
-                description: launcher pod name set
+                description: launcher pod name array
                 items:
                   type: string
                 type: array
               workerPods:
-                description: worker pod name list
+                description: worker pod name array
                 items:
                   type: string
                 type: array
