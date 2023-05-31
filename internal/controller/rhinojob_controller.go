@@ -196,7 +196,22 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		logger.Error(err, "Failed to update RhinoJob status")
 		return ctrl.Result{}, err
 	}
-
+	//get worker pod names
+	WorkerpodNames, err := r.getPodNames(&foundWorkersJob, ctx)
+	if err != nil {
+		logger.Error(err, "Failed to get worker pod names")
+		return ctrl.Result{}, err
+	} else {
+		rhinojob.Status.WorkerPodsNames = WorkerpodNames
+	}
+	//get launcher pod name
+	launcherPodName, err := r.getPodNames(&foundLauncherJob, ctx)
+	if err != nil {
+		logger.Error(err, "Failed to get launcher pod name")
+		return ctrl.Result{}, err
+	} else {
+		rhinojob.Status.LauncherPodsNames = launcherPodName
+	}
 	// 处理 TTL
 	if *rhinojob.Spec.TTL > 0 {
 		ttl_left := rhinojob.CreationTimestamp.Add(time.Second * time.Duration(*rhinojob.Spec.TTL)).Sub(time.Now())
@@ -401,4 +416,25 @@ func (r *RhinoJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			},
 		).
 		Complete(r)
+}
+
+// 获取 Job 的所有 Pod 的名称
+func (r *RhinoJobReconciler) getPodNames(job *kbatchv1.Job, ctx context.Context) ([]string, error) {
+	podList := &kcorev1.PodList{}
+	err := r.List(ctx, podList, client.InNamespace(job.Namespace))
+	if err != nil {
+		return nil, err
+	}
+
+	var podNames []string
+	for _, pod := range podList.Items {
+		for _, ownerRef := range pod.OwnerReferences {
+			if ownerRef.Kind == "Job" && ownerRef.Name == job.Name {
+				podNames = append(podNames, pod.Name)
+				break
+			}
+		}
+	}
+
+	return podNames, nil
 }
