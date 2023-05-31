@@ -160,7 +160,7 @@ spec:
                   this file'
                 type: string
               launcherPods:
-                description: launcher pod name list
+                description: launcher pod name set
                 items:
                   type: string
                 type: array

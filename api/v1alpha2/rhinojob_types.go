@@ -62,16 +62,14 @@ type RhinoJobStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	JobStatus JobStatus `json:"jobStatus"`
-	//launcher pod name list
+	//launcher pod name array
 	// +optional
-	// +kubebuilder:validation:MinItem:=0
 	// +kubebuilder:default:={}
-	LauncherPodsNames []string `json:"launcherPods,omitempty"`
-	//worker pod name list
+	LauncherPodNames []string `json:"launcherPods"`
+	//worker pod name array
 	// +optional
-	// +kubebuilder:validation:MinItem:=0
 	// +kubebuilder:default:={}
-	WorkerPodsNames []string `json:"workerPods,omitempty"`
+	WorkerPodNames []string `json:"workerPods"`
 }
 
 type JobStatus string
