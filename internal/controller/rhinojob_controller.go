@@ -171,19 +171,19 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			}
 		}
 	}
-	workerPodsName, err := r.getPodNamesFromLabel(&rhinojob, ctx, labelsForWorkerPod(&rhinojob))
+	workerPodNames, err := r.getPodNamesFromLabel(&rhinojob, ctx, labelsForWorkerPod(&rhinojob))
 	if err != nil {
-		logger.Error(err, "Unable to get worker pod name")
+		logger.Error(err, "Unable to get worker pod names")
 		return ctrl.Result{}, err
 	} else {
-		rhinojob.Status.WorkerPodNames = workerPodsName
+		rhinojob.Status.WorkerPodNames = workerPodNames
 	}
-	launcherPodName, err := r.getPodNamesFromLabel(&rhinojob, ctx, labelsForLauncherPod(&rhinojob))
+	launcherPodNames, err := r.getPodNamesFromLabel(&rhinojob, ctx, labelsForLauncherPod(&rhinojob))
 	if err != nil {
-		logger.Error(err, "Unable to get launcher pod name")
+		logger.Error(err, "Unable to get launcher pod names")
 		return ctrl.Result{}, err
 	} else {
-		rhinojob.Status.LauncherPodNames = launcherPodName
+		rhinojob.Status.LauncherPodNames = launcherPodNames
 	}
 
 	if errGetWorkersJob != nil && !errors.IsNotFound(errGetWorkersJob) { //Workers Job 获取失败，且原因也不是“该资源不存在”
