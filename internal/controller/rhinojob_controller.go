@@ -171,6 +171,21 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			}
 		}
 	}
+	workerPodNames, err := r.getPodNamesFromLabel(&rhinojob, ctx, labelsForWorkerPod(&rhinojob))
+	if err != nil {
+		logger.Error(err, "Unable to get worker pod names")
+		return ctrl.Result{}, err
+	} else {
+		rhinojob.Status.WorkerPodNames = workerPodNames
+	}
+	launcherPodNames, err := r.getPodNamesFromLabel(&rhinojob, ctx, labelsForLauncherPod(&rhinojob))
+	if err != nil {
+		logger.Error(err, "Unable to get launcher pod names")
+		return ctrl.Result{}, err
+	} else {
+		rhinojob.Status.LauncherPodNames = launcherPodNames
+	}
+
 	if errGetWorkersJob != nil && !errors.IsNotFound(errGetWorkersJob) { //Workers Job 获取失败，且原因也不是“该资源不存在”
 		logger.Error(errGetWorkersJob, "Failed to get workers job")
 		return ctrl.Result{}, errGetWorkersJob
@@ -196,7 +211,6 @@ func (r *RhinoJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		logger.Error(err, "Failed to update RhinoJob status")
 		return ctrl.Result{}, err
 	}
-
 	// 处理 TTL
 	if *rhinojob.Spec.TTL > 0 {
 		ttl_left := rhinojob.CreationTimestamp.Add(time.Second * time.Duration(*rhinojob.Spec.TTL)).Sub(time.Now())
@@ -244,6 +258,11 @@ func nameForLauncherJob(rj *rhinooprapiv1alpha2.RhinoJob) string {
 // Launcher Pod 的 Labels，也是后续寻址 Launcher Pod 的 Selector
 func labelsForLauncherPod(rj *rhinooprapiv1alpha2.RhinoJob) map[string]string {
 	return map[string]string{"app": rj.Name, "type": "launcher", "rhinoID": string(rj.UID)}
+}
+
+// worker Pod 的 Labels，也是后续寻址 worker Pod 的 Selector
+func labelsForWorkerPod(rj *rhinooprapiv1alpha2.RhinoJob) map[string]string {
+	return map[string]string{"app": rj.Name, "type": "worker", "rhinoID": string(rj.UID)}
 }
 
 func nameForWorkersJob(rj *rhinooprapiv1alpha2.RhinoJob) string {
@@ -309,6 +328,7 @@ func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha2.RhinoJo
 	name := nameForWorkersJob(rj)
 	launcherPodLabels := labelsForLauncherPod(rj)
 
+	workerPodLabels := labelsForWorkerPod(rj)
 	var foundPodList kcorev1.PodList
 	r.List(ctx, &foundPodList, client.MatchingLabels(launcherPodLabels))
 	completionMode := "Indexed"
@@ -326,6 +346,9 @@ func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha2.RhinoJo
 			Completions:    rj.Spec.Parallelism,
 			Parallelism:    rj.Spec.Parallelism,
 			Template: kcorev1.PodTemplateSpec{
+				ObjectMeta: kmetav1.ObjectMeta{
+					Labels: workerPodLabels,
+				},
 				Spec: kcorev1.PodSpec{
 					Containers: []kcorev1.Container{{
 						Image:   rj.Spec.Image,
@@ -367,12 +390,10 @@ func (r *RhinoJobReconciler) constructWorkersJob(rj *rhinooprapiv1alpha2.RhinoJo
 // the pods with ECI label and annotations will be created using ECIs.
 // Otherwise, the pods will be created using normal containers.
 func AddECILabelAndAnnotationsToPods(rj *rhinooprapiv1alpha2.RhinoJob, podTemplate *kcorev1.PodTemplateSpec) error {
-	podTemplate.ObjectMeta.Labels = map[string]string{
-		"alibabacloud.com/eci": "true", //For now, only Aliyun is supported.
-		//In the future, we will support other cloud providers.
-		//And let users choose the cloud provider.
-	}
-
+	//For now, only Aliyun is supported.
+	//In the future, we will support other cloud providers.
+	//And let users choose the cloud provider.
+	podTemplate.ObjectMeta.Labels["alibabacloud.com/eci"] = "true"
 	var memPerPod float64
 	var eciUseSpecs string
 	if rj.Spec.MemoryAllocationMode == rhinooprapiv1alpha2.FixedTotalMemory {
@@ -401,4 +422,20 @@ func (r *RhinoJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			},
 		).
 		Complete(r)
+}
+
+// getPodNamesFromLabel will update the RhinoJob status with the names of the pods controlled by the RhinoJob
+func (r *RhinoJobReconciler) getPodNamesFromLabel(rj *rhinooprapiv1alpha2.RhinoJob, ctx context.Context, label map[string]string) ([]string, error) {
+	var launcherFoundPodList kcorev1.PodList
+	var podsNames []string
+	if err := r.List(ctx, &launcherFoundPodList, client.MatchingLabels(label)); err != nil {
+		return nil, err
+	} else {
+		if len(launcherFoundPodList.Items) != 0 {
+			for _, pod := range launcherFoundPodList.Items {
+				podsNames = append(podsNames, pod.Name)
+			}
+		}
+	}
+	return podsNames, nil
 }
